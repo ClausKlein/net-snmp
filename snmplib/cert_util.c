@@ -782,7 +782,7 @@ _certindexes_load( void )
     if ( dir == NULL ) {
         DEBUGMSGT(("cert:index:load",
                    "creating new cert_indexes directory\n"));
-        mkdirhier( filename, NETSNMP_AGENT_DIRECTORY_MODE, 0);
+        mkdirhier( filename, NETSNMP_PUBLIC_DIRECTORY_MODE, 0);
         return;
     }
 

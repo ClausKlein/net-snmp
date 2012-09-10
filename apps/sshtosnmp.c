@@ -21,11 +21,13 @@
 #include <sys/un.h>
 #endif
 
+//XXX #include <sys/types.h>  //FIXME: needed for sendmsg?
 #include <sys/select.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <stdio.h>
+#include <string.h> // FIXME: use strcpy, memset, ...
 
 #ifndef MAXPATHLEN
 #warn no system max path length detected
@@ -84,11 +86,14 @@ main(int argc, char **argv) {
     }
 
     sock = socket(PF_UNIX, SOCK_STREAM, 0);
-    DEBUG("created socket");
-    if (sock <= 0) {
+    if (sock < 0) {
+        DEBUG("FAIL SOCKET");
+        DEBUG(strerror(errno));
         exit(1);
     }
+    DEBUG("created socket");
 
+#ifndef darwin9
     /* set the SO_PASSCRED option so we can pass uid */
     /* XXX: according to the unix(1) manual this shouldn't be needed
        on the sending side? */
@@ -97,10 +102,13 @@ main(int argc, char **argv) {
         setsockopt(sock, SOL_SOCKET, SO_PASSCRED, (void *) &one,
                    sizeof(one));
     }
+#endif
 
+    DEBUG("connect socket");
     if (connect(sock, (struct sockaddr *) &addr,
                 sizeof(struct sockaddr_un)) != 0) {
-        DEBUG("FAIL CONNECT");
+        DEBUG("FAIL CONNECT on: " DEFAULT_SOCK_PATH);
+        DEBUG(strerror(errno));
         exit(1);
     }
 
@@ -121,13 +129,15 @@ main(int argc, char **argv) {
 
     buf[0] = NETSNMP_SSHTOSNMP_VERSION_NUMBER;
     buf_len = 1;
-    
+
+#ifndef darwin9
+    DEBUG("sent name");
     /* send the prelim message and the credentials together using sendmsg() */
     {
         struct msghdr m;
         struct {
            struct cmsghdr cm;
-           struct ucred ouruser;
+           struct ucred ouruser;    //FIXME error on Darwin: field 'ouruser' has incomplete type
         } cmsg;
         struct iovec iov = { buf, buf_len };
 
@@ -138,6 +148,7 @@ main(int argc, char **argv) {
         /* set up the basic message */
         cmsg.cm.cmsg_len = sizeof(struct cmsghdr) + sizeof(struct ucred);
         cmsg.cm.cmsg_level = SOL_SOCKET;
+        //FIXME error on Darwin: 'SCM_CREDENTIALS' undeclared
         cmsg.cm.cmsg_type = SCM_CREDENTIALS;
 
         cmsg.ouruser.uid = getuid();
@@ -149,42 +160,59 @@ main(int argc, char **argv) {
         m.msg_control           = &cmsg;
         m.msg_controllen        = sizeof(cmsg);
         m.msg_flags             = 0;
-        
+
         DEBUG("sending to sock");
+        //FIXME error on Darwin: 'MSG_NOSIGNAL' undeclared
         rc = sendmsg(sock, &m, MSG_NOSIGNAL|MSG_DONTWAIT);
         if (rc < 0) {
             fprintf(stderr, "failed to send startup message\n");
             DEBUG("failed to send startup message\n");
+            DEBUG(strerror(errno));
             exit(1);
         }
     }
+#endif
 
-    DEBUG("sent name");
-    
     /* now we just send and receive from both the socket and stdin/stdout */
+    DEBUG("while work");
 
     while(1) {
         /* read from stdin and the socket */
+        FD_ZERO(&read_set);
         FD_SET(sock, &read_set);
         FD_SET(STDIN_FILENO, &read_set);
 
-        /* blocking without a timeout be fine fine */
-        select(sock+1, &read_set, NULL, NULL, NULL);
+        /* blocking without a timeout will be fine */
+        rc = select(sock+1, &read_set, NULL, NULL, NULL);
+        if (rc < 0) {
+            DEBUG("failed select\n");
+            DEBUG(strerror(errno));
+            continue;
+        }
 
         if (FD_ISSET(STDIN_FILENO, &read_set)) {
             /* read from stdin to get stuff from sshd to send to the agent */
             DEBUG("data from stdin");
             rc = read(STDIN_FILENO, buf, sizeof(buf));
 
-            if (rc <= 0) {
+            //Note: exit when read 0 bytes to terminate after EOF! ck
+            if (rc <= 0 && errno != EINTR) {
+                if (rc < 0) {
+                    DEBUG("failed read");
+                    DEBUG(strerror(errno));
+                }
                 /* end-of-file */
+
 #ifndef HAVE_CLOSESOCKET
                 rc = close(sock);
 #else
                 rc = closesocket(sock);
 #endif
+
                 exit(0);
             }
+
+
             DEBUG("read from stdin");
 
             /* send it up the pipe */
@@ -197,6 +225,7 @@ main(int argc, char **argv) {
                 if (rc < 0)
                     DEBUG("sentto failed");
                 if (rc < 0 && errno != EINTR) {
+                    DEBUG(strerror(errno));
                     break;
                 }
             }
@@ -213,20 +242,27 @@ main(int argc, char **argv) {
             rc = -1;
             while (rc < 0) {
                 rc = recvfrom(sock, buf, sizeof(buf), 0, NULL, NULL);
+                //FIXME: exit when read 0 bytes? ck
                 if (rc < 0 && errno != EINTR) {
+                    DEBUG("failed recvfrom");
+                    DEBUG(strerror(errno));
                     close(sock);
                     exit(0);
                 }
             }
-            DEBUG("read from socket");
 
-            pktsize = rc;
-            rc = write(STDOUT_FILENO, buf, pktsize);
-            /* XXX: check that counts match */
-            if (rc > 0) {
-                DEBUG("wrote to stdout");
-            } else {
-                DEBUG("failed to write to stdout");
+            // FIXME: send 0 byte message too? ck
+            if (rc >= 0) {
+                DEBUG("read from socket");
+                pktsize = rc;
+                rc = write(STDOUT_FILENO, buf, pktsize);
+                /* XXX: check that counts match */
+                if (rc >= 0 && rc == pktsize) {
+                    DEBUG("wrote to stdout");
+                } else {
+                    DEBUG("failed to write to stdout");
+                    DEBUG(strerror(errno));
+                }
             }
         }
     }

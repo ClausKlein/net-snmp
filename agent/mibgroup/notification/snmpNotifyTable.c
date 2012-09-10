@@ -544,12 +544,12 @@ snmpNotifyTable_add(struct snmpNotifyTable_data *thedata)
 
 
     if (header_complex_maybe_add_data(&snmpNotifyTableStorage, vars, thedata, 1)
-        != NULL){
-    	DEBUGMSGTL(("snmpNotifyTable", "registered an entry\n"));
-	retVal = SNMPERR_SUCCESS;
-    }else{
-        retVal = SNMPERR_GENERR; 
-    }	
+        != NULL) {
+        DEBUGMSGTL(("snmpNotifyTable", "registered an entry\n"));
+        retVal = SNMPERR_SUCCESS;
+    } else {
+        retVal = SNMPERR_GENERR;
+    }
 
 
     DEBUGMSGTL(("snmpNotifyTable", "done.\n"));

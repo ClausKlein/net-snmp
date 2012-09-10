@@ -106,8 +106,14 @@
 
 /* AGENT_DIRECTORY_MODE: the mode the agents should use to create
    directories with. Since the data stored here is probably sensitive, it
-   probably should be read-only by root/administrator. */
-#define NETSNMP_AGENT_DIRECTORY_MODE 0700
+   probably should be read-only by root/administrator, and executable by
+   group/world (for access to public subdirs). */
+#define NETSNMP_AGENT_DIRECTORY_MODE 0711
+
+/* PUBLIC_DIRECTORY_MODE: the mode the library should use to create public
+   directories with. Since the data stored here is public, it should be
+   world readable. */
+#define NETSNMP_PUBLIC_DIRECTORY_MODE 0755
 
 /* MAX_PERSISTENT_BACKUPS:
  *   The maximum number of persistent backups the library will try to

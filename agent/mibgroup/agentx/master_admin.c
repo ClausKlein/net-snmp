@@ -133,23 +133,23 @@ close_agentx_session(netsnmp_session * session, int sessid)
          * requests, so that the delegated request will be completed and
          * further requests can be processed
          */
-	while (netsnmp_remove_delegated_requests_for_session(session)) {
-		DEBUGMSGTL(("agentx/master", "Continue removing delegated reqests\n"));
-	}
+        while (netsnmp_remove_delegated_requests_for_session(session)) {
+                DEBUGMSGTL(("agentx/master", "Continue removing delegated reqests\n"));
+        }
 
         if (session->subsession != NULL) {
             netsnmp_session *subsession = session->subsession;
             for(; subsession; subsession = subsession->next) {
                 while (netsnmp_remove_delegated_requests_for_session(subsession)) {
-			DEBUGMSGTL(("agentx/master", "Continue removing delegated subsession reqests\n"));
-		}
+                        DEBUGMSGTL(("agentx/master", "Continue removing delegated subsession reqests\n"));
+                }
             }
         }
-                
+
         unregister_mibs_by_session(session);
         unregister_index_by_session(session);
         unregister_sysORTable_by_session(session);
-	SNMP_FREE(session->myvoid);
+        SNMP_FREE(session->myvoid);
         return AGENTX_ERR_NOERROR;
     }
 
@@ -442,17 +442,17 @@ agentx_notify(netsnmp_session * session, netsnmp_pdu *pdu)
      *     as this is valid AgentX syntax.
      */
 
-	/* If a context name was specified, send the trap using that context.
-	 * Otherwise, send the trap without the context using the old method */
-	if (pdu->contextName != NULL)
-	{
+        /* If a context name was specified, send the trap using that context.
+         * Otherwise, send the trap without the context using the old method */
+        if (pdu->contextName != NULL)
+        {
         send_trap_vars_with_context(-1, -1, pdu->variables, 
                        pdu->contextName);
-	}
-	else
-	{
+        }
+        else
+        {
         send_trap_vars(-1, -1, pdu->variables);
-	}
+        }
 
     return AGENTX_ERR_NOERROR;
 }
@@ -507,7 +507,7 @@ handle_master_agentx_packet(int operation,
 
     DEBUGMSGTL(("agentx/master", "handle pdu (req=0x%lx,trans=0x%lx,sess=0x%lx)\n",
                 (unsigned long)pdu->reqid, (unsigned long)pdu->transid,
-		(unsigned long)pdu->sessid));
+                (unsigned long)pdu->sessid));
     
     switch (pdu->command) {
     case AGENTX_MSG_OPEN:
@@ -584,7 +584,7 @@ handle_master_agentx_packet(int operation,
     DEBUGMSGTL(("agentx/master", "send response, stat %d (req=0x%lx,trans="
                 "0x%lx,sess=0x%lx)\n",
                 asp->status, (unsigned long)pdu->reqid,
-		(unsigned long)pdu->transid, (unsigned long)pdu->sessid));
+                (unsigned long)pdu->transid, (unsigned long)pdu->sessid));
     if (!snmp_send(asp->session, asp->pdu)) {
         char           *eb = NULL;
         int             pe, pse;

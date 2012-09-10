@@ -95,6 +95,9 @@ SOFTWARE.
 #include <sys/net/if_dl.h>
 #endif
 #endif
+#if HAVE_SYS_STAT_H
+#   include <sys/stat.h>
+#endif
 #include <errno.h>
 
 #if HAVE_LOCALE_H
@@ -787,6 +790,17 @@ register_default_handlers(void)
     netsnmp_register_service_handlers();
 }
 
+static void
+netsnmp_init_persistent_dir(void)
+{
+    struct stat     statbuf;
+
+    if (stat(get_persistent_directory(), &statbuf) != 0)
+        mkdirhier(get_persistent_directory(), NETSNMP_AGENT_DIRECTORY_MODE, 0);
+
+   return;
+}
+
 static int init_snmp_init_done = 0; /* To prevent double init's. */
 /**
  * Calls the functions to do config file loading and  mib module parsing
@@ -847,6 +861,7 @@ init_snmp(const char *type)
 #endif
 
     read_premib_configs();
+    netsnmp_init_persistent_dir();
 #ifndef NETSNMP_DISABLE_MIB_LOADING
     netsnmp_init_mib();
 #endif /* NETSNMP_DISABLE_MIB_LOADING */

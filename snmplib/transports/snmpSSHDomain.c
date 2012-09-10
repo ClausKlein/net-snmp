@@ -95,7 +95,7 @@ netsnmp_sockaddr_in2(struct sockaddr_in *addr,
 
 /*
  * Return a string representing the address in data, or else the "far end"
- * address if data is NULL.  
+ * address if data is NULL.
  */
 
 static char *
@@ -104,16 +104,16 @@ netsnmp_ssh_fmtaddr(netsnmp_transport *t, void *data, int len)
     netsnmp_ssh_addr_pair *addr_pair = NULL;
 
     if (data != NULL && len == sizeof(netsnmp_ssh_addr_pair)) {
-	addr_pair = (netsnmp_ssh_addr_pair *) data;
+        addr_pair = (netsnmp_ssh_addr_pair *) data;
     } else if (t != NULL && t->data != NULL) {
-	addr_pair = (netsnmp_ssh_addr_pair *) t->data;
+        addr_pair = (netsnmp_ssh_addr_pair *) t->data;
     }
 
     if (addr_pair == NULL) {
         return strdup("SSH: unknown");
     } else {
         struct sockaddr_in *to = NULL;
-	char tmp[64];
+        char tmp[64];
         to = (struct sockaddr_in *) &(addr_pair->remote_addr);
         if (to == NULL) {
             return strdup("SSH: unknown");
@@ -128,14 +128,14 @@ netsnmp_ssh_fmtaddr(netsnmp_transport *t, void *data, int len)
 
 
 /*
- * You can write something into opaque that will subsequently get passed back 
+ * You can write something into opaque that will subsequently get passed back
  * to your send function if you like.  For instance, you might want to
- * remember where a PDU came from, so that you can send a reply there...  
+ * remember where a PDU came from, so that you can send a reply there...
  */
 
 static int
 netsnmp_ssh_recv(netsnmp_transport *t, void *buf, int size,
-		 void **opaque, int *olength)
+                 void **opaque, int *olength)
 {
     int rc = -1;
     netsnmp_tmStateReference *tmStateRef = NULL;
@@ -145,7 +145,7 @@ netsnmp_ssh_recv(netsnmp_transport *t, void *buf, int size,
     DEBUGMSGTL(("ssh", "at the top of ssh_recv\n"));
     DEBUGMSGTL(("ssh", "t=%p\n", t));
     if (t != NULL && t->data != NULL) {
-	addr_pair = (netsnmp_ssh_addr_pair *) t->data;
+        addr_pair = (netsnmp_ssh_addr_pair *) t->data;
     }
 
     DEBUGMSGTL(("ssh", "addr_pair=%p\n", addr_pair));
@@ -153,16 +153,16 @@ netsnmp_ssh_recv(netsnmp_transport *t, void *buf, int size,
         DEBUGMSGTL(("ssh", "t=%p, addr_pair=%p, channel=%p\n",
                     t, addr_pair, addr_pair->channel));
         iamclient = 1;
-	while (rc < 0) {
-	    rc = libssh2_channel_read(addr_pair->channel, buf, size);
-	    if (rc < 0) {  /* XXX: from tcp; ssh equiv?:  && errno != EINTR */
-		DEBUGMSGTL(("ssh", "recv fd %d err %d (\"%s\")\n",
-			    t->sock, errno, strerror(errno)));
-		break;
-	    }
-	    DEBUGMSGTL(("ssh", "recv fd %d got %d bytes\n",
-			t->sock, rc));
-	}
+        while (rc < 0) {
+            rc = libssh2_channel_read(addr_pair->channel, buf, size);
+            if (rc < 0) {  /* XXX: from tcp; ssh equiv?:  && errno != EINTR */
+                DEBUGMSGTL(("ssh", "recv fd %d err %d (\"%s\")\n",
+                            t->sock, errno, strerror(errno)));
+                break;
+            }
+            DEBUGMSGTL(("ssh", "recv fd %d got %d bytes\n",
+                        t->sock, rc));
+        }
     } else if (t != NULL) {
 
 #ifdef SNMPSSHDOMAIN_USE_EXTERNAL_PIPE
@@ -185,6 +185,7 @@ netsnmp_ssh_recv(netsnmp_transport *t, void *buf, int size,
                 return -1;
             };
 
+#ifndef darwin9
             if (addr_pair->username[0] == '\0') {
                 /* we don't have a username yet, so this is the first message */
                 struct ucred *remoteuser;
@@ -202,7 +203,7 @@ netsnmp_ssh_recv(netsnmp_transport *t, void *buf, int size,
                 msg.msg_iovlen = 1;
                 msg.msg_control = &cmsg;
                 msg.msg_controllen = sizeof(cmsg);
-                
+
                 rc = recvmsg(t->sock, &msg, MSG_DONTWAIT); /* use DONTWAIT? */
                 if (rc <= 0) {
                     return rc;
@@ -257,7 +258,13 @@ netsnmp_ssh_recv(netsnmp_transport *t, void *buf, int size,
 
                 rc -= 1;
                 memmove(charbuf, &charbuf[1], rc);
-            } else {
+
+            } else
+
+#endif  // darwin9
+
+            {
+
                 while (rc < 0) {
                     rc = recvfrom(t->sock, buf, size, 0, NULL, NULL);
                     if (rc < 0 && errno != EINTR) {
@@ -272,7 +279,7 @@ netsnmp_ssh_recv(netsnmp_transport *t, void *buf, int size,
             DEBUGMSGTL(("ssh", "recv fd %d got %d bytes\n",
                         t->sock, rc));
         }
-        
+
 #else /* we're called directly by sshd and use stdin/out */
 
         struct passwd *user_pw;
@@ -332,13 +339,32 @@ netsnmp_ssh_recv(netsnmp_transport *t, void *buf, int size,
                 sizeof(tmStateRef->securityName));
     } else {
 #ifdef SNMPSSHDOMAIN_USE_EXTERNAL_PIPE
-        strlcpy(tmStateRef->securityName, addr_pair->username,
+        if (addr_pair->username[0] != '\0') {
+            strlcpy(tmStateRef->securityName, addr_pair->username,
                 sizeof(tmStateRef->securityName));
+
+#ifdef darwin9
+        } else {
+            /* 
+             * FIXME: This is a pour hack to test on MAC-OX:
+             */
+#warning "Every ssh user will be mapped to the configured NETSNMP_DS_LIB_SSH_USERNAME!"
+
+            //XXX DEBUGMSGTL(("ssh:getenv", "current username=%s\n", getenv("USER"))); // always root!
+            char * username = netsnmp_ds_get_string(NETSNMP_DS_LIBRARY_ID,
+                                         NETSNMP_DS_LIB_SSH_USERNAME);
+            if (username && 0 != *username) {
+                strlcpy(tmStateRef->securityName, username,
+                        sizeof(tmStateRef->securityName));
+            }
+#endif // darwin9
+
+        }
 #else /* we're called directly by sshd and use stdin/out */
         /* we're on the server... */
         /* XXX: this doesn't copy properly and can get pointer
            reference issues */
-        if (strlen(getenv("USER")) > 127) {
+        if (strlen(getenv("USER")) > MAX_NAME_LENGTH) {
             /* ruh roh */
             /* XXX: clean up */
             return -1;
@@ -353,6 +379,7 @@ netsnmp_ssh_recv(netsnmp_transport *t, void *buf, int size,
     }
     tmStateRef->securityName[sizeof(tmStateRef->securityName)-1] = '\0';
     tmStateRef->securityNameLen = strlen(tmStateRef->securityName);
+    DEBUGMSGTL(("ssh", "current username=%s\n", tmStateRef->securityName));
     *opaque = tmStateRef;
     *olength = sizeof(netsnmp_tmStateReference);
 
@@ -363,7 +390,7 @@ netsnmp_ssh_recv(netsnmp_transport *t, void *buf, int size,
 
 static int
 netsnmp_ssh_send(netsnmp_transport *t, void *buf, int size,
-		 void **opaque, int *olength)
+                 void **opaque, int *olength)
 {
     int rc = -1;
 
@@ -371,7 +398,7 @@ netsnmp_ssh_send(netsnmp_transport *t, void *buf, int size,
     netsnmp_tmStateReference *tmStateRef = NULL;
 
     if (t != NULL && t->data != NULL) {
-	addr_pair = (netsnmp_ssh_addr_pair *) t->data;
+        addr_pair = (netsnmp_ssh_addr_pair *) t->data;
     }
 
     if (opaque != NULL && *opaque != NULL &&
@@ -395,18 +422,18 @@ netsnmp_ssh_send(netsnmp_transport *t, void *buf, int size,
             snmp_log(LOG_ERR, "netsnmp_ssh_send was passed a tmStateReference with a securityName not equal to previous messages\n");
             return -1;
         }
-	while (rc < 0) {
-	    rc = libssh2_channel_write(addr_pair->channel, buf, size);
-	    if (rc < 0) { /* XXX:  && errno != EINTR */
-		break;
-	    }
-	}
+        while (rc < 0) {
+            rc = libssh2_channel_write(addr_pair->channel, buf, size);
+            if (rc < 0) { /* XXX:  && errno != EINTR */
+                break;
+            }
+        }
     } else if (t != NULL) {
 #ifdef SNMPSSHDOMAIN_USE_EXTERNAL_PIPE
 
-	while (rc < 0) {
+        while (rc < 0) {
             rc = sendto(t->sock, buf, size, 0, NULL, 0);
-            
+
             if (rc < 0 && errno != EINTR) {
                 break;
             }
@@ -414,13 +441,13 @@ netsnmp_ssh_send(netsnmp_transport *t, void *buf, int size,
 
 #else /* we're called directly by sshd and use stdin/out */
         /* on the server; send to stdout */
-	while (rc < 0) {
-	    rc = write(STDOUT_FILENO, buf, size);
+        while (rc < 0) {
+            rc = write(STDOUT_FILENO, buf, size);
             fflush(stdout);
-	    if (rc < 0 && errno != EINTR) { /* XXX:  && errno != EINTR */
-		break;
-	    }
-	}
+            if (rc < 0 && errno != EINTR) { /* XXX:  && errno != EINTR */
+                break;
+            }
+        }
 #endif
     }
 
@@ -436,7 +463,7 @@ netsnmp_ssh_close(netsnmp_transport *t)
     netsnmp_ssh_addr_pair *addr_pair = NULL;
 
     if (t != NULL && t->data != NULL) {
-	addr_pair = (netsnmp_ssh_addr_pair *) t->data;
+        addr_pair = (netsnmp_ssh_addr_pair *) t->data;
     }
 
     if (t != NULL && addr_pair && t->sock >= 0) {
@@ -464,7 +491,7 @@ netsnmp_ssh_close(netsnmp_transport *t)
 #ifdef SNMPSSHDOMAIN_USE_EXTERNAL_PIPE
 
         close(t->sock);
-        
+
         if (!addr_pair->session && !addr_pair->channel) {
             /* unix socket based connection */
             close(t->sock);
@@ -501,7 +528,7 @@ netsnmp_ssh_accept(netsnmp_transport *t)
 
     /* much of this is duplicated from snmpUnixDomain.c */
 
-    netsnmp_ssh_addr_pair *addr_pair;    
+    netsnmp_ssh_addr_pair *addr_pair;
     int                    newsock   = -1;
     struct sockaddr       *farend    = NULL;
     socklen_t              farendlen = sizeof(struct sockaddr_un);
@@ -522,12 +549,14 @@ netsnmp_ssh_accept(netsnmp_transport *t)
 
         newsock = accept(t->sock, farend, &farendlen);
 
+#ifndef darwin9
         /* set the SO_PASSCRED option so we can receive the remote uid */
         {
             int one = 1;
             setsockopt(newsock, SOL_SOCKET, SO_PASSCRED, (void *) &one,
                        sizeof(one));
         }
+#endif
 
         if (newsock < 0) {
             DEBUGMSGTL(("ssh","accept failed rc %d errno %d \"%s\"\n",
@@ -554,7 +583,7 @@ netsnmp_ssh_accept(netsnmp_transport *t)
 #else /* we're called directly by sshd and use stdin/out */
     /* we don't need to do anything; server side uses stdin/out */
     /* XXX: check that we're an ssh connection */
-    
+
     return STDIN_FILENO; /* return stdin */
 #endif /* ! SNMPSSHDOMAIN_USE_EXTERNAL_PIPE */
 
@@ -564,8 +593,8 @@ netsnmp_ssh_accept(netsnmp_transport *t)
 
 /*
  * Open a SSH-based transport for SNMP.  Local is TRUE if addr is the local
- * address to bind to (i.e. this is a server-type session); otherwise addr is 
- * the remote address to send things to.  
+ * address to bind to (i.e. this is a server-type session); otherwise addr is
+ * the remote address to send things to.
  */
 
 netsnmp_transport *
@@ -638,17 +667,19 @@ netsnmp_ssh_transport(struct sockaddr_in *addr, int local)
             return NULL;
         }
 
+#ifndef darwin9
         /* set the SO_PASSCRED option so we can receive the remote uid */
         {
             int one = 1;
             setsockopt(t->sock, SOL_SOCKET, SO_PASSCRED, (void *) &one,
                        sizeof(one));
         }
+#endif
 
         unlink(unaddr->sun_path);
         rc = bind(t->sock, (struct sockaddr *) unaddr, SUN_LEN(unaddr));
         if (rc != 0) {
-            DEBUGMSGTL(("netsnmp_ssh_transport",
+            DEBUGMSGTL(("ssh",
                         "couldn't bind \"%s\", errno %d (%s)\n",
                         unaddr->sun_path, errno, strerror(errno)));
             netsnmp_ssh_close(t);
@@ -701,14 +732,14 @@ netsnmp_ssh_transport(struct sockaddr_in *addr, int local)
 
         rc = listen(t->sock, NETSNMP_STREAM_QUEUE_LEN);
         if (rc != 0) {
-            DEBUGMSGTL(("netsnmp_ssh_transport",
+            DEBUGMSGTL(("ssh",
                         "couldn't listen to \"%s\", errno %d (%s)\n",
                         unaddr->sun_path, errno, strerror(errno)));
             netsnmp_ssh_close(t);
             netsnmp_transport_free(t);
             return NULL;
         }
-        
+
 
 #else /* we're called directly by sshd and use stdin/out */
         /* for ssh on the server side we've been launched so bind to
@@ -726,7 +757,7 @@ netsnmp_ssh_transport(struct sockaddr_in *addr, int local)
         char *username;
         char *keyfilepub;
         char *keyfilepriv;
-        
+
         /* use the requested user name */
         /* XXX: default to the current user name on the system like ssh does */
         username = netsnmp_ds_get_string(NETSNMP_DS_LIBRARY_ID,
@@ -754,7 +785,7 @@ netsnmp_ssh_transport(struct sockaddr_in *addr, int local)
             return NULL;
         }
 
-        /* xxx: need an ipv6 friendly one too (sigh) */
+        /* XXX: need an ipv6 friendly one too (sigh) */
 
         /* XXX: not ideal when structs don't actually match size wise */
         memcpy(&(addr_pair->remote_addr), addr, sizeof(struct sockaddr_in));
@@ -784,7 +815,7 @@ netsnmp_ssh_transport(struct sockaddr_in *addr, int local)
          */
 
         rc = connect(t->sock, (struct sockaddr *)addr,
-		     sizeof(struct sockaddr));
+                     sizeof(struct sockaddr));
 
         if (rc < 0) {
             netsnmp_ssh_close(t);
@@ -795,7 +826,7 @@ netsnmp_ssh_transport(struct sockaddr_in *addr, int local)
         /*
          * Allow user to override the send and receive buffers. Default is
          * to use os default.  Don't worry too much about errors --
-         * just plough on regardless.  
+         * just plough on regardless.
          */
         netsnmp_sock_buffer_set(t->sock, SO_SNDBUF, local, 0);
         netsnmp_sock_buffer_set(t->sock, SO_RCVBUF, local, 0);
@@ -880,7 +911,7 @@ netsnmp_ssh_transport(struct sockaddr_in *addr, int local)
     DEBUGMSG(("ssh","Opened connection.\n"));
     /*
      * Message size is not limited by this transport (hence msgMaxSize
-     * is equal to the maximum legal size of an SNMP message).  
+     * is equal to the maximum legal size of an SNMP message).
      */
 
     t->msgMaxSize = 0x7fffffff;
@@ -897,7 +928,7 @@ netsnmp_ssh_transport(struct sockaddr_in *addr, int local)
 
 netsnmp_transport *
 netsnmp_ssh_create_tstring(const char *str, int local,
-			   const char *default_target)
+                           const char *default_target)
 {
     struct sockaddr_in addr;
 
@@ -972,7 +1003,7 @@ sshdomain_parse_socket(const char *token, char *cptr)
 }
 
 void
-netsnmp_ssh_ctor(void)    
+netsnmp_ssh_ctor(void)
 {
     sshDomain.name = netsnmp_snmpSSHDomain;
     sshDomain.name_length = netsnmp_snmpSSHDomain_len;

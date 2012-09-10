@@ -2875,7 +2875,7 @@ netsnmp_mibindex_load( void )
     dir = opendir( tmpbuf );
     if ( dir == NULL ) {
         DEBUGMSGTL(("mibindex", "load: (new)\n"));
-        mkdirhier( tmpbuf, NETSNMP_AGENT_DIRECTORY_MODE, 0);
+        mkdirhier( tmpbuf, NETSNMP_PUBLIC_DIRECTORY_MODE, 0);
         return;
     }
 

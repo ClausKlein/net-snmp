@@ -681,19 +681,6 @@ _agentx_realloc_build(u_char ** buf, size_t * buf_len, size_t * out_len,
     session->s_snmp_errno = 0;
     session->s_errno = 0;
 
-    /*
-     * Various PDU types don't include context information (RFC 2741, p. 20). 
-     */
-    switch (pdu->command) {
-    case AGENTX_MSG_OPEN:
-    case AGENTX_MSG_CLOSE:
-    case AGENTX_MSG_RESPONSE:
-    case AGENTX_MSG_COMMITSET:
-    case AGENTX_MSG_UNDOSET:
-    case AGENTX_MSG_CLEANUPSET:
-        pdu->flags &= ~(AGENTX_MSG_FLAG_NON_DEFAULT_CONTEXT);
-    }
-
 	/* We've received a PDU that has specified a context.  NetSNMP however, uses
 	 * the pdu->community field to specify context when using the AgentX
 	 * protocol.  Therefore we need to copy the context name and length into the
@@ -702,8 +689,21 @@ _agentx_realloc_build(u_char ** buf, size_t * buf_len, size_t * out_len,
 	{	
 		pdu->community     = (u_char *) strdup(pdu->contextName);
 		pdu->community_len = pdu->contextNameLen;
-		pdu->flags |= AGENTX_MSG_FLAG_NON_DEFAULT_CONTEXT;
+		pdu->flags |= AGENTX_MSG_FLAG_NON_DEFAULT_CONTEXT;  // may be wrong, se below!
 	}
+
+    /*
+     * Various PDU types don't include context information (RFC 2741, p. 20)! 
+     */
+    switch (pdu->command) {
+    case AGENTX_MSG_OPEN:
+    case AGENTX_MSG_CLOSE:
+    case AGENTX_MSG_RESPONSE:
+    case AGENTX_MSG_COMMITSET:
+    case AGENTX_MSG_UNDOSET:
+    case AGENTX_MSG_CLEANUPSET:
+        pdu->flags &= ~(AGENTX_MSG_FLAG_NON_DEFAULT_CONTEXT);   // now fix the flag
+    }
 
     /*
      * Build the header (and context if appropriate).  
@@ -1009,7 +1009,7 @@ _agentx_realloc_build(u_char ** buf, size_t * buf_len, size_t * out_len,
 
     agentx_build_int((*buf + 16), (*out_len - ilen) - 20, network_order);
 
-    DEBUGMSGTL(("agentx_build", "packet built okay\n"));
+    DEBUGMSGTL(("agentx_build", "packet build okay\n"));
     return 1;
 }
 

@@ -148,11 +148,11 @@ snmpNotifyFilterProfileTable_add(struct snmpNotifyFilterProfileTable_data
                               thedata->snmpTargetParamsNameLen);
 
     if (header_complex_maybe_add_data(&snmpNotifyFilterProfileTableStorage, vars,
-                                      thedata, 1) != NULL){
-       DEBUGMSGTL(("snmpNotifyFilterProfileTable", "registered an entry\n"));
-       retVal = SNMPERR_SUCCESS;
-    }else{
-       retVal = SNMPERR_GENERR;  	
+                                      thedata, 1) != NULL) {
+        DEBUGMSGTL(("snmpNotifyFilterProfileTable", "registered an entry\n"));
+        retVal = SNMPERR_SUCCESS;
+    } else {
+        retVal = SNMPERR_GENERR;
     }
 
 
