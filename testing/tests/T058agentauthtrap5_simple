@@ -1,0 +1,59 @@
+#!/bin/sh
+
+. ../eval_tools.sh
+
+HEADER authentication failure v3 traps are stored under context snmptrapd and readable from subagent, both use same v3 user
+
+SKIPIF NETSNMP_DISABLE_SNMPV3
+
+#
+# Begin test
+#
+
+# standard V1 configuration: testcommunity
+. ./Sv1config
+# add in a v3 trap sink
+CONFIGAGENT engineID 0x7f000001
+#result: CONFIGAGENT oldEngineID 0x80001f880430783766303030303031
+#IPADDR CONFIGAGENT engineIDType 2  # use ipaddr!
+# CONFIGAGENT engineIDNic 1   # 
+CONFIGAGENT trapsess -v 3 -u unsec -l noAuthNoPriv $SNMP_TRANSPORT_SPEC:$SNMP_TEST_DEST$SNMP_SNMPTRAPD_PORT
+CONFIGAGENT authtrapenable 1
+CONFIGAGENT createUser unsec MD5 "--none--" DES "--none--"
+CONFIGAGENT rwuser unsec noAuthNoPriv -V all \'*\'
+CONFIGAGENT master agentx
+CONFIGAGENT agentxsocket tcp:127.0.0.1:7050
+CONFIGAGENT authcommunity read,write  snmptrapd default -V all snmptrapd
+
+CONFIGTRAPD authcommunity log public
+CONFIGTRAPD authUser log unsec noAuthNoPriv -V _all_ \'*\'
+#XXX CONFIGTRAPD disableAuthorization no
+CONFIGTRAPD agentxsocket tcp:127.0.0.1:7050
+CONFIGTRAPD createUser -e 0x80001f880430783766303030303031 unsec MD5 "--none--" DES "--none--"
+
+
+STARTAGENT
+
+#XXX start agentx slave after agentx master to speedup the test
+STARTTRAPD
+# wait for agentx connection!
+SNMP_SLEEP=3
+WAITFORTRAPD "AgentX subagent connected"
+
+# give the agent more time to start up.  We only want to fire one
+# request (retries = 0) to make sure only one trap is sent.
+CAPTURE "snmpget -On -r 0 -t 5 $SNMP_FLAGS -v 2c -c wrongcommunity $SNMP_TRANSPORT_SPEC:$SNMP_TEST_DEST$SNMP_SNMPD_PORT .1.3.6.1.2.1.1.3.0"
+
+CAPTURE "snmpwalk -r 0 -t 5 -v 3 -u unsec -l noAuthNoPriv -n snmptrapd $SNMP_TRANSPORT_SPEC:$SNMP_TEST_DEST$SNMP_SNMPD_PORT NOTIFICATION-LOG-MIB::notificationLogMIB"
+
+STOPAGENT
+
+STOPTRAPD
+
+###XXX CHECKORDIE "coldStart"
+CHECKTRAPDORDIE "authenticationFailure"
+CHECKANDDIE "Timeout: "
+###XXX CHECKORDIE "coldStart"
+CHECKORDIE "authenticationFailure"
+
+FINISHED
