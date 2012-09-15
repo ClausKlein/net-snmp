@@ -102,6 +102,13 @@ usm_generate_OID(oid * prefix, size_t prefixLen, struct usmUser *uptr,
     oid            *indexOid;
     int             i;
 
+    if (uptr->engineIDLen && !uptr->engineID) {
+        snmp_log(LOG_ERR,
+        "usm_generate_OID(name=%s, ID=%p, IDlen=%d) assert(!uptr->engineIDLen || (uptr->engineIDLen && uptr->engineID)) failed!\n",
+            uptr->name, uptr->engineID, uptr->engineIDLen);
+        uptr->engineIDLen = 0; // FIXME: hack to continue without engineID!
+    }
+
     *length = 2 + uptr->engineIDLen + strlen(uptr->name) + prefixLen;
     indexOid = (oid *) malloc(*length * sizeof(oid));
     if (indexOid) {

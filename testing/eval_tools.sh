@@ -142,6 +142,23 @@ VERIFY() {	# <path_to_file(s)>
 	[ "$missingfiles" = true ] && exit 1000
 }
 
+GOOD() {
+    testnum=`expr $testnum + 1`
+    echo "ok $testnum - $1"
+    echo "# ok $testnum - $1" >> $SNMP_TMPDIR/invoked
+}
+
+BAD() {
+    testnum=`expr $testnum + 1`
+###XXX errnum=`expr $errnum + 1`
+    echo "not ok $testnum - $1"
+    echo "# not ok $testnum - $1" >> $SNMP_TMPDIR/invoked
+}
+
+COMMENT() {
+    echo "# $@"
+    echo "# $@" >> $SNMP_TMPDIR/invoked
+}
 
 #------------------------------------ -o-
 #
@@ -251,6 +268,67 @@ CHECKFILE() {
     junkoutputfile="$file"
     CHECK $*
     junkoutputfile="$myoldjunkoutputfile"
+}
+
+#------------------------------------ -o-
+# Returns: Count of matched lines.
+#
+CHECKFILECOUNT() {	# <pattern_to_match>
+    chkfile=$1
+    ckfcount=$2
+    shift
+    shift
+    if [ $SNMP_VERBOSE -gt 0 ]; then
+	echo -n "checking output for \"$*\"..."
+    fi
+
+    if [ -f $chkfile ]; then
+	rval=`grep -c "$*" "$chkfile" 2>/dev/null`
+    else
+        COMMENT "Note: file $chkfile does not exist and we were asked to check it"
+	rval=0
+    fi
+
+    if [ $SNMP_VERBOSE -gt 0 ]; then
+	echo "$rval matches found"
+    fi
+
+    snmp_last_test_result=$rval
+    EXPECTRESULT $ckfcount  # default
+    if [ "$ckfcount" != "noerror" ]; then
+      if [ "$ckfcount" = "atleastone" ]; then
+        if [ "$rval" -ne "0" ]; then
+            GOOD "found $ckfcount copies of '$*' in output ($chkfile); needed one"
+        else
+            BAD "found $rval copies of '$*' in output ($chkfile); expected 1"
+            COMMENT "Outputfile: $chkfile"
+        fi
+      else
+        if [ "$rval" = "$ckfcount" ]; then
+           GOOD "found $ckfcount copies of '$*' in output ($chkfile)"
+        else
+           BAD "found $rval copies of '$*' in output ($chkfile); expected $ckfcount"
+           COMMENT "Outputfile: $chkfile"
+        fi
+      fi
+    fi
+    return $rval
+}
+
+CHECKCOUNT() {
+   CHECKFILECOUNT "$junkoutputfile" $@
+}
+
+CHECKAGENTCOUNT() {
+    count=$1
+    shift
+    CHECKFILECOUNT $SNMP_SNMPD_LOG_FILE $count $@
+}
+
+CHECKTRAPDCOUNT() {
+    count=$1
+    shift
+    CHECKFILECOUNT $SNMP_SNMPTRAPD_LOG_FILE $count $@
 }
 
 CHECKTRAPD() {

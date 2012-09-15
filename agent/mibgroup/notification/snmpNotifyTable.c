@@ -379,6 +379,8 @@ notifyTable_register_notifications(int major, int minor,
      * notify table 
      */
     nptr = SNMP_MALLOC_STRUCT(snmpNotifyTable_data);
+    if (nptr == NULL)
+        return 0;
     nptr->snmpNotifyName = strdup(buf);
     nptr->snmpNotifyNameLen = strlen(buf);
     nptr->snmpNotifyTag = strdup(buf);
@@ -484,7 +486,7 @@ int
 snmpNotifyTable_add(struct snmpNotifyTable_data *thedata)
 {
     netsnmp_variable_list *vars = NULL;
-
+    int retVal;	
 
     DEBUGMSGTL(("snmpNotifyTable", "adding data...  "));
     /*
@@ -497,12 +499,17 @@ snmpNotifyTable_add(struct snmpNotifyTable_data *thedata)
 
 
 
-    header_complex_add_data(&snmpNotifyTableStorage, vars, thedata);
-    DEBUGMSGTL(("snmpNotifyTable", "registered an entry\n"));
+    if (header_complex_add_data(&snmpNotifyTableStorage, vars, thedata)
+        != NULL) {
+        DEBUGMSGTL(("snmpNotifyTable", "registered an entry\n"));
+        retVal = SNMPERR_SUCCESS;
+    } else {
+        retVal = SNMPERR_GENERR;
+    }
 
 
     DEBUGMSGTL(("snmpNotifyTable", "done.\n"));
-    return SNMPERR_SUCCESS;
+    return retVal;
 }
 
 
@@ -532,6 +539,7 @@ parse_snmpNotifyTable(const char *token, char *line)
                               &StorageTmp->snmpNotifyNameLen);
     if (StorageTmp->snmpNotifyName == NULL) {
         config_perror("invalid specification for snmpNotifyName");
+        SNMP_FREE(StorageTmp);
         return;
     }
 
@@ -541,6 +549,7 @@ parse_snmpNotifyTable(const char *token, char *line)
                               &StorageTmp->snmpNotifyTagLen);
     if (StorageTmp->snmpNotifyTag == NULL) {
         config_perror("invalid specification for snmpNotifyTag");
+        SNMP_FREE(StorageTmp);
         return;
     }
 
@@ -557,9 +566,11 @@ parse_snmpNotifyTable(const char *token, char *line)
                               &StorageTmp->snmpNotifyRowStatus, &tmpint);
 
 
-
-
-    snmpNotifyTable_add(StorageTmp);
+    if (snmpNotifyTable_add(StorageTmp) != SNMPERR_SUCCESS){
+        SNMP_FREE(StorageTmp->snmpNotifyName);
+        SNMP_FREE(StorageTmp->snmpNotifyTag);
+        SNMP_FREE(StorageTmp);
+    }
 
 
     DEBUGMSGTL(("snmpNotifyTable", "done.\n"));

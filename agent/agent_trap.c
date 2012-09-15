@@ -795,6 +795,13 @@ netsnmp_send_traps(int trap, int specific,
       *pdu_in_addr_t = get_myaddr();
     }
 
+	/* A context name was provided, so copy it and its length to the v2 pdu
+	 * template. */
+	if (context != NULL)
+	{
+		template_v2pdu->contextName    = strdup(context);
+		template_v2pdu->contextNameLen = strlen(context);
+	}
 
     /*
      *  Now loop through the list of trap sinks
@@ -918,11 +925,12 @@ send_trap_to_sess(netsnmp_session * sess, netsnmp_pdu *template_pdu)
        ) {
         result =
             snmp_async_send(sess, pdu, &handle_inform_response, NULL);
-        
+
     } else {
         if ((sess->version == SNMP_VERSION_3) &&
                 (pdu->command == SNMP_MSG_TRAP2) &&
                 (sess->securityEngineIDLen == 0)) {
+            //FIXME: added errorhandling and traces; ck
             len = snmpv3_get_engineID(tmp, sizeof(tmp));
             memdup(&pdu->securityEngineID, tmp, len);
             pdu->securityEngineIDLen = len;
@@ -949,6 +957,21 @@ send_trap_vars(int trap, int specific, netsnmp_variable_list * vars)
     else
         send_enterprise_trap_vars(trap, specific, trap_version_id,
                                   OID_LENGTH(trap_version_id), vars);
+}
+
+/* Send a trap under a context */
+void send_trap_vars_with_context(int trap, int specific, 
+              netsnmp_variable_list *vars, char *context)
+{
+    if (trap == SNMP_TRAP_ENTERPRISESPECIFIC)
+        netsnmp_send_traps(trap, specific, objid_enterprisetrap,
+                                  OID_LENGTH(objid_enterprisetrap), vars,
+								  context, 0);
+    else
+        netsnmp_send_traps(trap, specific, trap_version_id,
+                                  OID_LENGTH(trap_version_id), vars, 
+								  context, 0);
+    	
 }
 
 /**
@@ -1007,6 +1030,25 @@ void
 send_v2trap(netsnmp_variable_list * vars)
 {
     send_trap_vars(-1, -1, vars);
+}
+
+/**
+ * Similar to send_v2trap(), with the added ability to specify a context.  If
+ * the last parameter is NULL, then this call is equivalent to send_v2trap().
+ *
+ * @param vars is used to supply the list of variable bindings for the trap.
+ * 
+ * @param context is used to specify the context of the trap.
+ *
+ * @return void
+ *
+ * @see send_v2trap
+ */
+void send_v3trap(netsnmp_variable_list *vars, char *context)
+{
+    netsnmp_send_traps(-1, -1, 
+					trap_version_id, OID_LENGTH(trap_version_id),
+                    vars, context, 0);
 }
 
 void
@@ -1213,9 +1255,14 @@ snmpd_parse_config_trapsess(const char *word, char *cptr)
     if (ss->version == SNMP_VERSION_3 &&
         traptype != SNMP_MSG_INFORM   &&
         ss->securityEngineIDLen == 0) {
-            len = snmpv3_get_engineID( tmp, sizeof(tmp));
-            memdup(&ss->securityEngineID, tmp, len);
-            ss->securityEngineIDLen = len;
+            //FIXME: added errorhandling and traces; nothing else! ck
+            len = snmpv3_get_engineID(tmp, sizeof(tmp));
+            if (memdup(&(ss->securityEngineID), tmp, len) == SNMPERR_SUCCESS) {
+                ss->securityEngineIDLen = len;
+                DEBUGMSGTL(( "trap", "snmpd_parse_config_trapsess "));
+                DEBUGMSGHEX(("trap", ss->securityEngineID, len));
+                DEBUGMSG(( "trap", "\n"));
+            }
     }
 
 #ifndef NETSNMP_DISABLE_SNMPV1

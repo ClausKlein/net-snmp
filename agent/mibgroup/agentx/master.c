@@ -387,9 +387,9 @@ agentx_got_response(int operation,
             DEBUGMSGOID(("agentx/master", var->name, var->name_length));
             DEBUGMSG(("agentx/master", "\n"));
             if (netsnmp_ds_get_boolean(NETSNMP_DS_APPLICATION_ID, NETSNMP_DS_AGENT_VERBOSE)) {
-                DEBUGMSGTL(("snmp_agent", "    >> "));
-                DEBUGMSGVAR(("snmp_agent", var));
-                DEBUGMSG(("snmp_agent", "\n"));
+                DEBUGMSGTL(("agentx/master", "    >> "));
+                DEBUGMSGVAR(("agentx/master", var));
+                DEBUGMSG(("agentx/master", "\n"));
             }
 
             /*
@@ -615,12 +615,13 @@ agentx_master_handler(netsnmp_mib_handler *handler,
     /*
      * send the requests out.
      */
-    DEBUGMSGTL(("agentx", "sending pdu (req=0x%x,trans=0x%x,sess=0x%x)\n",
+    DEBUGMSGTL(("agentx/master", "sending pdu (req=0x%x,trans=0x%x,sess=0x%x)\n",
                 pdu->reqid,pdu->transid, pdu->sessid));
     result = snmp_async_send(ax_session, pdu, agentx_got_response, cb_data);
-
-    if (result == 0 ) {
-        snmp_free_pdu( pdu );
+    if (result == 0) {
+        snmp_free_pdu(pdu);
+        if (cb_data)
+            netsnmp_free_delegated_cache((netsnmp_delegated_cache*) cb_data);
     }
 
     return SNMP_ERR_NOERROR;

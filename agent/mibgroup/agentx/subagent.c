@@ -242,6 +242,24 @@ free_set_vars(netsnmp_session * ss, netsnmp_pdu *pdu)
     }
 }
 
+static void
+send_agentx_error(netsnmp_session *session, netsnmp_pdu *pdu, int errstat, int errindex)
+{
+    pdu = snmp_clone_pdu(pdu);
+    pdu->command   = AGENTX_MSG_RESPONSE;
+    pdu->version   = session->version;
+    pdu->errstat   = errstat;
+    pdu->errindex  = errindex;
+    snmp_free_varbind(pdu->variables);
+    pdu->variables = NULL;
+
+    DEBUGMSGTL(("agentx/subagent", "Sending AgentX response error stat %d idx %d\n",
+             errstat, errindex));
+    if (!snmp_send(session, pdu)) {
+        snmp_free_pdu(pdu);
+    }
+}
+
 int
 handle_agentx_packet(int operation, netsnmp_session * session, int reqid,
                      netsnmp_pdu *pdu, void *magic)
@@ -323,6 +341,7 @@ handle_agentx_packet(int operation, netsnmp_session * session, int reqid,
             (ns_subagent_magic *) calloc(1, sizeof(ns_subagent_magic));
         if (smagic == NULL) {
             DEBUGMSGTL(("agentx/subagent", "couldn't malloc() smagic\n"));
+            /* would like to send_agentx_error(), but it needs memory too */
             return 1;
         }
         smagic->original_command = pdu->command;
@@ -386,6 +405,7 @@ handle_agentx_packet(int operation, netsnmp_session * session, int reqid,
         if (asi == NULL) {
             SNMP_FREE(smagic);
             snmp_log(LOG_WARNING, "save_set_vars() failed\n");
+            send_agentx_error(session, pdu, AGENTX_ERR_PARSE_FAILED, 0);
             return 1;
         }
         asi->mode = pdu->command = SNMP_MSG_INTERNAL_SET_RESERVE1;
@@ -399,6 +419,7 @@ handle_agentx_packet(int operation, netsnmp_session * session, int reqid,
         if (asi == NULL) {
             SNMP_FREE(smagic);
             snmp_log(LOG_WARNING, "restore_set_vars() failed\n");
+            send_agentx_error(session, pdu, AGENTX_ERR_PROCESSING_ERROR, 0);
             return 1;
         }
         if (asi->mode != SNMP_MSG_INTERNAL_SET_RESERVE2) {
@@ -406,6 +427,7 @@ handle_agentx_packet(int operation, netsnmp_session * session, int reqid,
             snmp_log(LOG_WARNING,
                      "dropping bad AgentX request (wrong mode %d)\n",
                      asi->mode);
+            send_agentx_error(session, pdu, AGENTX_ERR_PROCESSING_ERROR, 0);
             return 1;
         }
         asi->mode = pdu->command = SNMP_MSG_INTERNAL_SET_ACTION;
@@ -419,6 +441,7 @@ handle_agentx_packet(int operation, netsnmp_session * session, int reqid,
         if (asi == NULL) {
             SNMP_FREE(smagic);
             snmp_log(LOG_WARNING, "restore_set_vars() failed\n");
+            send_agentx_error(session, pdu, AGENTX_ERR_PROCESSING_ERROR, 0);
             return 1;
         }
         if (asi->mode == SNMP_MSG_INTERNAL_SET_RESERVE1 ||
@@ -443,6 +466,7 @@ handle_agentx_packet(int operation, netsnmp_session * session, int reqid,
         if (asi == NULL) {
             SNMP_FREE(smagic);
             snmp_log(LOG_WARNING, "restore_set_vars() failed\n");
+            send_agentx_error(session, pdu, AGENTX_ERR_PROCESSING_ERROR, 0);
             return 1;
         }
         asi->mode = pdu->command = SNMP_MSG_INTERNAL_SET_UNDO;

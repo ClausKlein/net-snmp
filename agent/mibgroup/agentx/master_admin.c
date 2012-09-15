@@ -139,20 +139,25 @@ close_agentx_session(netsnmp_session * session, int sessid)
          * requests, so that the delegated request will be completed and
          * further requests can be processed
          */
-        netsnmp_remove_delegated_requests_for_session(session);
+        while (netsnmp_remove_delegated_requests_for_session(session)) {
+                DEBUGMSGTL(("agentx/master", "Continue removing delegated reqests\n"));
+        }
+
         if (session->subsession != NULL) {
             netsnmp_session *subsession = session->subsession;
             for(; subsession; subsession = subsession->next) {
-                netsnmp_remove_delegated_requests_for_session(subsession);
+                while (netsnmp_remove_delegated_requests_for_session(subsession)) {
+                        DEBUGMSGTL(("agentx/master", "Continue removing delegated subsession reqests\n"));
+                }
             }
         }
-                
+
         unregister_mibs_by_session(session);
         unregister_index_by_session(session);
         snmp_call_callbacks(SNMP_CALLBACK_APPLICATION,
                             SNMPD_CALLBACK_REQ_UNREG_SYSOR_SESS,
                             (void*)session);
-	SNMP_FREE(session->myvoid);
+        SNMP_FREE(session->myvoid);
         return AGENTX_ERR_NOERROR;
     }
 
@@ -456,7 +461,18 @@ agentx_notify(netsnmp_session * session, netsnmp_pdu *pdu)
      *     as this is valid AgentX syntax.
      */
 
-    send_trap_vars(-1, -1, pdu->variables);
+        /* If a context name was specified, send the trap using that context.
+         * Otherwise, send the trap without the context using the old method */
+        if (pdu->contextName != NULL)
+        {
+        send_trap_vars_with_context(-1, -1, pdu->variables, 
+                       pdu->contextName);
+        }
+        else
+        {
+        send_trap_vars(-1, -1, pdu->variables);
+        }
+
     return AGENTX_ERR_NOERROR;
 }
 

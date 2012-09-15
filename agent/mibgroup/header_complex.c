@@ -385,8 +385,8 @@ header_complex_add_data_by_oid(struct header_complex_index **thedata,
         else if (0 == rc) {
             snmp_log(LOG_WARNING, "header_complex_add_data_by_oid with "
                      "duplicate index.\n");
-            /** uncomment null return when callers do error checking */
-            /** return NULL; */
+            /***FIXME check that all callers do error checking ***/
+            return NULL;
         }
     }
 

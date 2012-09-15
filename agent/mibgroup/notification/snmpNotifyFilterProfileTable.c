@@ -134,7 +134,7 @@ snmpNotifyFilterProfileTable_add(struct snmpNotifyFilterProfileTable_data
                                  *thedata)
 {
     netsnmp_variable_list *vars = NULL;
-
+    int retVal;
 
     DEBUGMSGTL(("snmpNotifyFilterProfileTable", "adding data...  "));
     /*
@@ -146,13 +146,17 @@ snmpNotifyFilterProfileTable_add(struct snmpNotifyFilterProfileTable_data
                               (u_char *) thedata->snmpTargetParamsName,
                               thedata->snmpTargetParamsNameLen);
 
-    header_complex_add_data(&snmpNotifyFilterProfileTableStorage, vars,
-                            thedata);
-    DEBUGMSGTL(("snmpNotifyFilterProfileTable", "registered an entry\n"));
+    if (header_complex_add_data(&snmpNotifyFilterProfileTableStorage, vars,
+                                thedata) != NULL) {
+        DEBUGMSGTL(("snmpNotifyFilterProfileTable", "registered an entry\n"));
+        retVal = SNMPERR_SUCCESS;
+    } else {
+        retVal = SNMPERR_GENERR;
+    }
 
 
     DEBUGMSGTL(("snmpNotifyFilterProfileTable", "done.\n"));
-    return SNMPERR_SUCCESS;
+    return retVal;
 }
 
 
@@ -189,6 +193,7 @@ parse_snmpNotifyFilterProfileTable(const char *token, char *line)
                               &StorageTmp->snmpNotifyFilterProfileNameLen);
     if (StorageTmp->snmpNotifyFilterProfileName == NULL) {
         config_perror("invalid specification for snmpNotifyFilterProfileName");
+        SNMP_FREE(StorageTmp);
         return;
     }
 
@@ -202,7 +207,11 @@ parse_snmpNotifyFilterProfileTable(const char *token, char *line)
                               &StorageTmp->
                               snmpNotifyFilterProfileRowStatus, &tmpint);
 
-    snmpNotifyFilterProfileTable_add(StorageTmp);
+    if (snmpNotifyFilterProfileTable_add(StorageTmp) != SNMPERR_SUCCESS){
+        SNMP_FREE(StorageTmp->snmpTargetParamsName);
+        SNMP_FREE(StorageTmp->snmpNotifyFilterProfileName);
+        SNMP_FREE(StorageTmp);
+    }
 
     DEBUGMSGTL(("snmpNotifyFilterProfileTable", "done.\n"));
 }
@@ -648,6 +657,8 @@ write_snmpNotifyFilterProfileRowStatus(int action,
 
             StorageNew =
                 SNMP_MALLOC_STRUCT(snmpNotifyFilterProfileTable_data);
+            if (StorageNew == NULL)
+                return SNMP_ERR_GENERR;
             memdup((u_char **) & (StorageNew->snmpTargetParamsName),
                    vars->val.string, vars->val_len);
             StorageNew->snmpTargetParamsNameLen = vars->val_len;

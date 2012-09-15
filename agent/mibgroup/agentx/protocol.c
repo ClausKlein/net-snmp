@@ -460,6 +460,7 @@ agentx_realloc_build_varbind(u_char ** buf, size_t * buf_len,
     case ASN_COUNTER:
     case ASN_GAUGE:
     case ASN_TIMETICKS:
+    case ASN_UINTEGER:
         if (!agentx_realloc_build_int(buf, buf_len, out_len, allow_realloc,
                                       *(vp->val.integer), network_order)) {
             DEBUGINDENTLESS();
@@ -547,6 +548,7 @@ agentx_realloc_build_varbind(u_char ** buf, size_t * buf_len,
                 DEBUGINDENTLESS();
                 return 0;
             }
+            DEBUGINDENTLESS();
         } else {
             DEBUGDUMPHEADER("send", "Build Counter64 (low, high)");
             if (!agentx_realloc_build_int
@@ -561,6 +563,7 @@ agentx_realloc_build_varbind(u_char ** buf, size_t * buf_len,
                 DEBUGINDENTLESS();
                 return 0;
             }
+            DEBUGINDENTLESS();
         }
         break;
 
@@ -684,6 +687,17 @@ _agentx_realloc_build(u_char ** buf, size_t * buf_len, size_t * out_len,
 
     session->s_snmp_errno = 0;
     session->s_errno = 0;
+
+	/* We've received a PDU that has specified a context.  NetSNMP however, uses
+	 * the pdu->community field to specify context when using the AgentX
+	 * protocol.  Therefore we need to copy the context name and length into the
+	 * pdu->community and pdu->community_len fields, respectively. */
+	if (pdu->contextName != NULL && pdu->community == NULL)
+	{	
+		pdu->community     = strdup(pdu->contextName);
+		pdu->community_len = pdu->contextNameLen;
+		pdu->flags |= AGENTX_MSG_FLAG_NON_DEFAULT_CONTEXT;
+	}
 
     /*
      * Various PDU types don't include context information (RFC 2741, p. 20). 
@@ -1159,6 +1173,7 @@ agentx_parse_oid(u_char * data, size_t * length, int *inc,
     tmp_oid_len = (prefix ? n_subid + 5 : n_subid);
     if (*oid_len < tmp_oid_len) {
         DEBUGMSGTL(("agentx", "Oversized Object ID\n"));
+        DEBUGINDENTLESS();
         return NULL;
     }
 
@@ -1169,6 +1184,7 @@ agentx_parse_oid(u_char * data, size_t * length, int *inc,
 #endif
     if (*length < 4 * n_subid) {
         DEBUGMSGTL(("agentx", "Incomplete Object ID\n"));
+        DEBUGINDENTLESS();
         return NULL;
     }
 
@@ -1366,6 +1382,7 @@ agentx_parse_varbind(u_char * data, size_t * length, int *type,
     case ASN_COUNTER:
     case ASN_GAUGE:
     case ASN_TIMETICKS:
+    case ASN_UINTEGER:
         int_val = agentx_parse_int(bufp, network_byte_order);
         memmove(data_buf, &int_val, 4);
         *data_len = 4;
@@ -1423,6 +1440,7 @@ agentx_parse_varbind(u_char * data, size_t * length, int *type,
         break;
 
     default:
+        DEBUGMSG(("recv", "Can not parse type %x", *type));
         DEBUGINDENTLESS();
         return NULL;
     }
@@ -1525,6 +1543,7 @@ agentx_parse_header(netsnmp_pdu *pdu, u_char * data, size_t * length)
     DEBUGINDENTLESS();
     bufp += 4;
 
+    DEBUGINDENTLESS();
     *length -= 20;
     if (*length != payload) {   /* Short payload */
         return NULL;
@@ -1601,11 +1620,21 @@ agentx_parse(netsnmp_session * session, netsnmp_pdu *pdu, u_char * data,
         pdu->community_len = buf_len;
         snmp_clone_mem((void **) &pdu->community,
                        (void *) buffer, (unsigned) buf_len);
+
+		/* The NetSNMP API stuffs the context into the PDU's community string
+		 * field, when using the AgentX Protocol.  The rest of the code however,
+		 * expects to find the context in the PDU's context field.  Therefore we
+		 * need to copy the context into the PDU's context fields.  */
+		if (pdu->community_len > 0 && pdu->contextName == NULL)
+		{
+			pdu->contextName    = strdup(pdu->community);
+			pdu->contextNameLen = pdu->community_len;
+		}
+
         buf_len = sizeof(buffer);
     }
 
     DEBUGDUMPHEADER("recv", "PDU");
-    DEBUGINDENTMORE();
     switch (pdu->command) {
     case AGENTX_MSG_OPEN:
         pdu->time = *bufp;      /* Timeout */
@@ -1870,13 +1899,10 @@ agentx_parse(netsnmp_session * session, netsnmp_pdu *pdu, u_char * data,
 
     default:
         DEBUGINDENTLESS();
-        DEBUGINDENTLESS();
         DEBUGMSGTL(("agentx", "Unrecognised PDU type: %d\n",
                     pdu->command));
         return SNMPERR_UNKNOWN_PDU;
     }
-    DEBUGINDENTLESS();
-    DEBUGINDENTLESS();
     DEBUGINDENTLESS();
     return SNMP_ERR_NOERROR;
 }
