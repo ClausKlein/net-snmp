@@ -31,7 +31,7 @@
 #include <dlfcn.h>
 #include "dlmod.h"
 
-static struct dlmod *dlmods = NULL;
+static struct dlmod *dlmods;
 static int      dlmod_next_index = 1;
 static char     dlmod_path[1024];
 
@@ -156,7 +156,7 @@ dlmod_load_module(struct dlmod *dlm)
 #endif
         if (dlm->handle == NULL) {
             snprintf(dlm->error, sizeof(dlm->error),
-                     "dlopen failed: %s", dlerror());
+                     "dlopen(%s) failed: %s", dlm->path, dlerror());
             dlm->status = DLMOD_ERROR;
             return;
         }
@@ -171,7 +171,7 @@ dlmod_load_module(struct dlmod *dlm)
 #endif
             if (dlm->handle == NULL) {
                 snprintf(dlm->error, sizeof(dlm->error),
-                         "dlopen failed: %s", dlerror());
+                         "dlopen(%s) failed: %s", tmp_path, dlerror());
                 dlm->status = DLMOD_ERROR;
             }
         }
