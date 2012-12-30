@@ -53,15 +53,16 @@ dlmod_create_module(void)
     struct dlmod  **pdlmod, *dlm;
 
     DEBUGMSGTL(("dlmod", "dlmod_create_module\n"));
-    dlm = (struct dlmod *) calloc(1, sizeof(struct dlmod));
+    dlm = calloc(1, sizeof(struct dlmod));
     if (dlm == NULL)
         return NULL;
 
     dlm->index = (int)dlmod_next_index++;
     dlm->status = DLMOD_UNLOADED;
 
-    for (pdlmod = &dlmods; *pdlmod != NULL; pdlmod = &((*pdlmod)->next));
-    (*pdlmod) = dlm;
+    for (pdlmod = &dlmods; *pdlmod != NULL; pdlmod = &((*pdlmod)->next))
+        ;
+    *pdlmod = dlm;
 
     return dlm;
 }
@@ -280,18 +281,15 @@ header_dlmod(struct variable *vp,
     oid             newname[MAX_OID_LEN];
     int             result;
 
-    memcpy((char *) newname, (char *) vp->name,
-           (int) vp->namelen * sizeof(oid));
+    memcpy((char *) newname, (char *) vp->name, vp->namelen * sizeof(oid));
     newname[DLMOD_NAME_LENGTH] = 0;
 
-    result =
-        snmp_oid_compare(name, *length, newname, (int) vp->namelen + 1);
+    result = snmp_oid_compare(name, *length, newname, vp->namelen + 1);
     if ((exact && (result != 0)) || (!exact && (result >= 0))) {
         return MATCH_FAILED;
     }
 
-    memcpy((char *) name, (char *) newname,
-           ((int) vp->namelen + 1) * sizeof(oid));
+    memcpy((char *) name, (char *) newname, (vp->namelen + 1) * sizeof(oid));
     *length = vp->namelen + 1;
     *write_method = 0;
     *var_len = sizeof(long);    /* default to 'long' results */
@@ -310,9 +308,8 @@ var_dlmod(struct variable * vp,
      * variables we may use later
      */
 
-    *write_method = 0;          /* assume it isnt writable for the time being */
-    *var_len = sizeof(int);     /* assume an integer and change later
-                                 * if not */
+    *write_method = 0;         /* assume it isn't writable for the time being */
+    *var_len = sizeof(int);    /* assume an integer and change later if not */
 
     if (header_dlmod(vp, name, length, exact,
                      var_len, write_method) == MATCH_FAILED)
@@ -469,8 +466,7 @@ header_dlmodEntry(struct variable *vp,
     struct dlmod   *dlm = NULL;
     unsigned int    dlmod_index;
 
-    memcpy((char *) newname, (char *) vp->name,
-           (int) vp->namelen * sizeof(oid));
+    memcpy((char *) newname, (char *) vp->name, vp->namelen * sizeof(oid));
     *write_method = 0;
 
     for (dlmod_index = 1; dlmod_index < dlmod_next_index; dlmod_index++) {
@@ -481,8 +477,7 @@ header_dlmodEntry(struct variable *vp,
 
         if (dlm) {
             newname[12] = dlmod_index;
-            result = snmp_oid_compare(name, *length, newname,
-                                      (int) vp->namelen + 1);
+            result = snmp_oid_compare(name, *length, newname, vp->namelen + 1);
 
             if ((exact && (result == 0)) || (!exact && (result < 0)))
                 break;
@@ -497,8 +492,7 @@ header_dlmodEntry(struct variable *vp,
         return NULL;
     }
 
-    memcpy((char *) name, (char *) newname,
-           ((int) vp->namelen + 1) * sizeof(oid));
+    memcpy((char *) name, (char *) newname, (vp->namelen + 1) * sizeof(oid));
     *length = vp->namelen + 1;
     *var_len = sizeof(long);
     return dlm;
@@ -518,8 +512,7 @@ var_dlmodEntry(struct variable * vp,
     *var_len = sizeof(int);     /* assume an integer and change later
                                  * if not */
 
-    dlm =
-        header_dlmodEntry(vp, name, length, exact, var_len, write_method);
+    dlm = header_dlmodEntry(vp, name, length, exact, var_len, write_method);
     if (dlm == NULL)
         return NULL;
 
