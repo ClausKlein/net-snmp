@@ -4,6 +4,7 @@
  */
 #include <net-snmp/net-snmp-config.h>
 
+#include <ctype.h>
 #if HAVE_STDLIB_H
 #include <stdlib.h>
 #endif
@@ -24,7 +25,11 @@
 #include "struct.h"
 #include "util_funcs.h"
 
+#if defined(WIN32)
+#include <windows.h>
+#else
 #include <dlfcn.h>
+#endif
 #include "dlmod.h"
 
 static struct dlmod *dlmods;
@@ -73,10 +78,10 @@ init_dlmod(void)
         const char * const p = getenv("SNMPDLMODPATH");
         strlcpy(dlmod_path, SNMPDLMODPATH, sizeof(dlmod_path));
         if (p) {
-            if (p[0] == ':') {
+            if (p[0] == ENV_SEPARATOR_CHAR) {
                 int len = strlen(dlmod_path);
-                if (len >= 1 && dlmod_path[len - 1] != ':')
-                    strlcat(dlmod_path, ":", sizeof(dlmod_path));
+                if (len >= 1 && dlmod_path[len - 1] != ENV_SEPARATOR_CHAR)
+                    strlcat(dlmod_path, ENV_SEPARATOR, sizeof(dlmod_path));
                 strlcat(dlmod_path, p + 1, sizeof(dlmod_path));
             } else
                 strlcpy(dlmod_path, p, sizeof(dlmod_path));
@@ -130,12 +135,102 @@ dlmod_delete_module(struct dlmod *dlm)
         }
 }
 
+#if defined(WIN32)
+/*
+ * See also Microsoft, "Overview of x64 Calling Conventions", MSDN
+ * (http://msdn.microsoft.com/en-us/library/ms235286.aspx).
+ */
+#ifdef _M_X64
+typedef int (*dl_function_ptr)(void);
+#else
+typedef int (__stdcall *dl_function_ptr)(void);
+#endif
+#else
+typedef int (*dl_function_ptr)(void);
+#endif
+
+#if defined(WIN32)
+static const char dlmod_dl_suffix[] = "dll";
+#else
+static const char dlmod_dl_suffix[] = "so";
+#endif
+
+static void* dlmod_dlopen(const char *path)
+{
+#if defined(WIN32)
+    return LoadLibrary(path);
+#elif defined(RTLD_NOW)
+    return dlopen(path, RTLD_NOW);
+#else
+    return dlopen(path, RTLD_LAZY);
+#endif
+}
+
+static void dlmod_dlclose(void *handle)
+{
+#if defined(WIN32)
+    FreeLibrary(handle);
+#else
+    dlclose(handle);
+#endif
+}
+
+static void *dlmod_dlsym(void *handle, const char *symbol)
+{
+#if defined(WIN32)
+    return GetProcAddress(handle, symbol);
+#else
+    return dlsym(handle, symbol);
+#endif
+}
+
+static const char *dlmod_dlerror(void)
+{
+#if defined(WIN32)
+    static char errstr[256];
+    const DWORD dwErrorcode = GetLastError();
+    LPTSTR      lpMsgBuf;
+
+    FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
+                  NULL, dwErrorcode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                  (LPTSTR) &lpMsgBuf, 0, NULL);
+    if (lpMsgBuf) {
+        LPTSTR          p;
+
+        /*
+         * Remove trailing "\r\n".
+         */
+        p = strchr(lpMsgBuf, '\r');
+        if (p)
+            *p = '\0';
+        snprintf(errstr, sizeof(errstr), "%s", lpMsgBuf);
+        LocalFree(lpMsgBuf);
+    } else {
+        snprintf(errstr, sizeof(errstr), "error code %ld", dwErrorcode);
+    }
+    return errstr;
+#else
+    return dlerror();
+#endif
+}
+
+static int dlmod_is_abs_path(const char *path)
+{
+#if defined(WIN32)
+    return (strncmp(path, "//", 2) == 0 || strncmp(path, "\\\\", 2) == 0) ||
+        (isalpha((u_char)path[0]) && path[1] == ':' &&
+         (path[2] == '/' || path[2] == '\\'));
+#else
+    return path[0] == '/';
+#endif
+}
+
 void
 dlmod_load_module(struct dlmod *dlm)
 {
     char            sym_init[64];
     char           *p, tmp_path[255];
-    int             (*dl_init) (void);
+    dl_function_ptr dl_init;
     char           *st;
 
     DEBUGMSGTL(("dlmod", "dlmod_load_module %s: %s\n", dlm->name,
@@ -145,30 +240,24 @@ dlmod_load_module(struct dlmod *dlm)
         (dlm->status != DLMOD_UNLOADED && dlm->status != DLMOD_ERROR))
         return;
 
-    if (dlm->path[0] == '/') {
-#ifdef RTLD_NOW
-        dlm->handle = dlopen(dlm->path, RTLD_NOW);
-#else
-        dlm->handle = dlopen(dlm->path, RTLD_LAZY);
-#endif
+    if (dlmod_is_abs_path(dlm->path)) {
+        dlm->handle = dlmod_dlopen(dlm->path);
         if (dlm->handle == NULL) {
             snprintf(dlm->error, sizeof(dlm->error),
-                     "dlopen(%s) failed: %s", dlm->path, dlerror());
+                     "dlopen(%s) failed: %s", dlm->path, dlmod_dlerror());
             dlm->status = DLMOD_ERROR;
             return;
         }
     } else {
-        for (p = strtok_r(dlmod_path, ":", &st); p; p = strtok_r(NULL, ":", &st)) {
-            snprintf(tmp_path, sizeof(tmp_path), "%s/%s.so", p, dlm->path);
+        for (p = strtok_r(dlmod_path, ENV_SEPARATOR, &st); p;
+             p = strtok_r(NULL, ENV_SEPARATOR, &st)) {
+            snprintf(tmp_path, sizeof(tmp_path), "%s/%s.%s", p, dlm->path,
+                     dlmod_dl_suffix);
             DEBUGMSGTL(("dlmod", "p: %s tmp_path: %s\n", p, tmp_path));
-#ifdef RTLD_NOW
-            dlm->handle = dlopen(tmp_path, RTLD_NOW);
-#else
-            dlm->handle = dlopen(tmp_path, RTLD_LAZY);
-#endif
+            dlm->handle = dlmod_dlopen(tmp_path);
             if (dlm->handle == NULL) {
                 snprintf(dlm->error, sizeof(dlm->error),
-                         "dlopen(%s) failed: %s", tmp_path, dlerror());
+                         "dlopen(%s) failed: %s", tmp_path, dlmod_dlerror());
                 dlm->status = DLMOD_ERROR;
             }
         }
@@ -177,9 +266,9 @@ dlmod_load_module(struct dlmod *dlm)
             return;
     }
     snprintf(sym_init, sizeof(sym_init), "init_%s", dlm->name);
-    dl_init = dlsym(dlm->handle, sym_init);
+    dl_init = dlmod_dlsym(dlm->handle, sym_init);
     if (dl_init == NULL) {
-        dlclose(dlm->handle);
+        dlmod_dlclose(dlm->handle);
         snprintf(dlm->error, sizeof(dlm->error),
                  "dlsym failed: can't find \'%s\'", sym_init);
         dlm->status = DLMOD_ERROR;
@@ -195,19 +284,19 @@ void
 dlmod_unload_module(struct dlmod *dlm)
 {
     char            sym_deinit[64];
-    int             (*dl_deinit) (void);
+    dl_function_ptr dl_deinit;
 
     if (!dlm || dlm->status != DLMOD_LOADED)
         return;
 
     snprintf(sym_deinit, sizeof(sym_deinit), "deinit_%s", dlm->name);
-    dl_deinit = dlsym(dlm->handle, sym_deinit);
+    dl_deinit = dlmod_dlsym(dlm->handle, sym_deinit);
     if (dl_deinit) {
         DEBUGMSGTL(("dlmod", "Calling deinit_%s()\n", dlm->name));
         dl_deinit();
     } else {
         snprintf(sym_deinit, sizeof(sym_deinit), "shutdown_%s", dlm->name);
-        dl_deinit = dlsym(dlm->handle, sym_deinit);
+        dl_deinit = dlmod_dlsym(dlm->handle, sym_deinit);
         if (dl_deinit) {
             DEBUGMSGTL(("dlmod", "Calling shutdown_%s()\n", dlm->name));
             dl_deinit();
@@ -215,7 +304,7 @@ dlmod_unload_module(struct dlmod *dlm)
             DEBUGMSGTL(("dlmod", "No destructor for %s\n", dlm->name));
         }
     }
-    dlclose(dlm->handle);
+    dlmod_dlclose(dlm->handle);
     dlm->status = DLMOD_UNLOADED;
     DEBUGMSGTL(("dlmod", "Module %s unloaded\n", dlm->name));
 }
