@@ -62,7 +62,7 @@ dlmod_create_module(void)
     if (dlm == NULL)
         return NULL;
 
-    dlm->index = (int)dlmod_next_index++;
+    dlm->index = dlmod_next_index++;
     dlm->status = DLMOD_UNLOADED;
 
     for (pdlmod = &dlmods; *pdlmod != NULL; pdlmod = &((*pdlmod)->next))
@@ -370,7 +370,7 @@ header_dlmod(struct variable *vp,
     oid             newname[MAX_OID_LEN];
     int             result;
 
-    memcpy((char *) newname, (char *) vp->name, vp->namelen * sizeof(oid));
+    memcpy(newname, vp->name, vp->namelen * sizeof(oid));
     newname[DLMOD_NAME_LENGTH] = 0;
 
     result = snmp_oid_compare(name, *length, newname, vp->namelen + 1);
@@ -378,7 +378,7 @@ header_dlmod(struct variable *vp,
         return MATCH_FAILED;
     }
 
-    memcpy((char *) name, (char *) newname, (vp->namelen + 1) * sizeof(oid));
+    memcpy(name, newname, (vp->namelen + 1) * sizeof(oid));
     *length = vp->namelen + 1;
     *write_method = 0;
     *var_len = sizeof(long);    /* default to 'long' results */
@@ -555,7 +555,7 @@ header_dlmodEntry(struct variable *vp,
     struct dlmod   *dlm = NULL;
     unsigned int    dlmod_index;
 
-    memcpy((char *) newname, (char *) vp->name, vp->namelen * sizeof(oid));
+    memcpy(newname, vp->name, vp->namelen * sizeof(oid));
     *write_method = 0;
 
     for (dlmod_index = 1; dlmod_index < dlmod_next_index; dlmod_index++) {
@@ -581,7 +581,7 @@ header_dlmodEntry(struct variable *vp,
         return NULL;
     }
 
-    memcpy((char *) name, (char *) newname, (vp->namelen + 1) * sizeof(oid));
+    memcpy(name, newname, (vp->namelen + 1) * sizeof(oid));
     *length = vp->namelen + 1;
     *var_len = sizeof(long);
     return dlm;
