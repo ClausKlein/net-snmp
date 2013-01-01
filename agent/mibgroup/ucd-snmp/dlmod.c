@@ -407,7 +407,7 @@ header_dlmod(struct variable *vp,
     oid             newname[MAX_OID_LEN];
     int             result;
 
-    memcpy((char *) newname, (char *) vp->name, vp->namelen * sizeof(oid));
+    memcpy(newname, vp->name, vp->namelen * sizeof(oid));
     newname[DLMOD_NAME_LENGTH] = 0;
 
     result = snmp_oid_compare(name, *length, newname, vp->namelen + 1);
@@ -415,7 +415,7 @@ header_dlmod(struct variable *vp,
         return MATCH_FAILED;
     }
 
-    memcpy((char *) name, (char *) newname, (vp->namelen + 1) * sizeof(oid));
+    memcpy(name, newname, (vp->namelen + 1) * sizeof(oid));
     *length = vp->namelen + 1;
     *write_method = 0;
     *var_len = sizeof(long);    /* default to 'long' results */
@@ -481,7 +481,7 @@ header_dlmodEntry(struct variable *vp,
     struct dlmod   *dlm = 0;
     int             dlmod_index;
 
-    memcpy((char *) newname, (char *) vp->name, vp->namelen * sizeof(oid));
+    memcpy(newname, vp->name, vp->namelen * sizeof(oid));
     *write_method = 0;
 
     for (dlmod_index = 1; dlmod_index < dlmod_next_index; dlmod_index++) {
@@ -507,7 +507,7 @@ header_dlmodEntry(struct variable *vp,
         return NULL;
     }
 
-    memcpy((char *) name, (char *) newname, (vp->namelen + 1) * sizeof(oid));
+    memcpy(name, newname, (vp->namelen + 1) * sizeof(oid));
     *length = vp->namelen + 1;
     *var_len = sizeof(long);
     return dlm;
@@ -578,7 +578,7 @@ write_dlmodName(int action,
         dlm = dlmod_get_by_index(name[12]);
         if (!dlm || dlm->status == DLMOD_LOADED)
             return SNMP_ERR_RESOURCEUNAVAILABLE;
-        memcpy(dlm->name, (const char *) var_val, var_val_len);
+        memcpy(dlm->name, var_val, var_val_len);
         dlm->name[var_val_len] = 0;
     }
     return SNMP_ERR_NOERROR;
@@ -605,7 +605,7 @@ write_dlmodPath(int action,
         dlm = dlmod_get_by_index(name[12]);
         if (!dlm || dlm->status == DLMOD_LOADED)
             return SNMP_ERR_RESOURCEUNAVAILABLE;
-        memcpy(dlm->path, (const char *) var_val, var_val_len);
+        memcpy(dlm->path, var_val, var_val_len);
         dlm->path[var_val_len] = 0;
     }
     return SNMP_ERR_NOERROR;
