@@ -120,6 +120,9 @@ init_snmp_mib(void)
         REGISTER_SYSOR_TABLE(system_module_oid, system_module_oid_len,
                              "The MIB module for SNMPv2 entities");
 #endif
+    //NOTE: see init_agent_read_config()
+    // snmpd_register_config_handler("pauthtrapenable",
+    //                               snmpd_parse_config_authtrap, NULL, "NUMBER");
     snmp_register_callback(SNMP_CALLBACK_LIBRARY, SNMP_CALLBACK_STORE_DATA,
                            snmp_enableauthentraps_store, NULL);
 }

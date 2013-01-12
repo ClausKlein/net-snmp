@@ -234,7 +234,7 @@ SYSTEM_get_eth_statistics(VAR_OID_T * data_source, ETH_STATS_T * where)
     static time_t   ifLastRead = 0;
     time_t          curr_time;
     u_char          need_to_read;
-    u_long          rc;
+    static u_long   rc;
 
     where->ifIndex = data_source->objid[data_source->length - 1];
     need_to_read = (where->ifIndex != prev.ifIndex);
@@ -248,8 +248,9 @@ SYSTEM_get_eth_statistics(VAR_OID_T * data_source, ETH_STATS_T * where)
                        ((double) rand() / (double) RAND_MAX) * 100.0);
         ifLastRead = time(NULL);
         prev.ifIndex = where->ifIndex;
-    } else
-        rc = 0;
+    } else {
+        ; //TBD rc = 0;
+    }
 
     memcpy(where, &prev, sizeof(ETH_STATS_T));
     where->octets += rc * 100 * 200;

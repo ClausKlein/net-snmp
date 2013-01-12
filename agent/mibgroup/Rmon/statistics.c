@@ -250,11 +250,15 @@ write_etherStatsEntry(int action, u_char * var_val, u_char var_val_type,
 
     case RESERVE2:
         /*
-         * get values from PDU, check them and save them in the cloned entry 
+         * get values from PDU, check them and save them in the cloned entry
          */
         long_temp = name[etherStatsEntryFirstIndexBegin];
         leaf_id = (int) name[etherStatsEntryFirstIndexBegin - 1];
         hdr = ROWAPI_find(table_ptr, long_temp);        /* it MUST be OK */
+        if (!hdr) {
+            ag_trace("cannot find it leaf_id=%d\n", leaf_id);   /* XXX */
+            return SNMP_ERR_NOSUCHNAME;
+        }
         cloned_body = (CRTL_ENTRY_T *) hdr->tmp;
         body = (CRTL_ENTRY_T *) hdr->body;
         switch (leaf_id) {

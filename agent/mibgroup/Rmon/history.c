@@ -723,7 +723,8 @@ init_history(void)
                       &history_Activate,
                       &history_Deactivate, &history_Copy);
 
-    /*
-     * add_hist_entry (2, 3, 4, 2); 
-     */
+#if 0                           /* debug */
+     add_hist_entry (2, 3, 4, 2);
+#endif
+
 }

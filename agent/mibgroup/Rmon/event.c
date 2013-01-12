@@ -819,10 +819,12 @@ init_event(void)
 
     ROWAPI_init_table(&EventCtrlTable, "Event", 0, &event_Create, &event_Clone, &event_Delete, NULL,    /* &event_Validate, */
                       &event_Activate, &event_Deactivate, &event_Copy);
-#if 0
+
+#if 0                                          /* debug */
     add_event_entry(3, "Alarm", EVENT_LOG_AND_TRAP, NULL);
     /*
      * add_event_entry (5, ">=", EVENT_LOG_AND_TRAP, NULL); 
      */
 #endif
+
 }
