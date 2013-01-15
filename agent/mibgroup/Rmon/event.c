@@ -72,6 +72,7 @@
 #define EVENTOWNER            8
 #define EVENTSTATUS           9
 
+#define Leaf_event_index        1
 #define Leaf_event_description  2
 #define MIN_event_description   0
 #define MAX_event_description   127
@@ -265,7 +266,6 @@ write_eventControl(int action, u_char * var_val, u_char var_val_type,
     static int      prev_action = COMMIT;
     RMON_ENTRY_T   *hdr;
     CRTL_ENTRY_T   *cloned_body;
-    CRTL_ENTRY_T   *body;
 
     switch (action) {
     case RESERVE1:
@@ -285,8 +285,11 @@ write_eventControl(int action, u_char * var_val, u_char var_val_type,
         long_temp = name[eventEntryFirstIndexBegin];
         leaf_id = (int) name[eventEntryFirstIndexBegin - 1];
         hdr = ROWAPI_find(table_ptr, long_temp);        /* it MUST be OK */
+        if (!hdr) {
+            ag_trace("cannot find it leaf_id=%d\n", leaf_id);
+            return SNMP_ERR_NOSUCHNAME;
+        }
         cloned_body = (CRTL_ENTRY_T *) hdr->tmp;
-        body = (CRTL_ENTRY_T *) hdr->body;
         switch (leaf_id) {
         case Leaf_event_description:
             char_temp = AGMALLOC(1 + MAX_event_description);
@@ -322,6 +325,8 @@ write_eventControl(int action, u_char * var_val, u_char var_val_type,
             }
             cloned_body->event_type = long_temp;
             break;
+        case Leaf_event_last_time_sent:
+            return SNMP_ERR_NOTWRITABLE;
         case Leaf_event_community:
             char_temp = AGMALLOC(1 + MAX_event_community);
             if (!char_temp)
@@ -460,7 +465,6 @@ var_logTable(struct variable *vp,
     static long     long_ret;
     static DATA_ENTRY_T theEntry;
     RMON_ENTRY_T   *hdr;
-    CRTL_ENTRY_T   *ctrl;
 
     *write_method = NULL;
     hdr = ROWDATAAPI_header_DataEntry(vp, name, length, exact, var_len,
@@ -469,8 +473,6 @@ var_logTable(struct variable *vp,
                                       sizeof(DATA_ENTRY_T), &theEntry);
     if (!hdr)
         return NULL;
-
-    ctrl = (CRTL_ENTRY_T *) hdr->body;
 
     *var_len = sizeof(long);    /* default */
 
