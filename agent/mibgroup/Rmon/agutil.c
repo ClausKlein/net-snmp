@@ -1,5 +1,5 @@
 /**************************************************************
- * Copyright (C) 2001 Alex Rozin, Optical Access 
+ * Copyright (C) 2001 Alex Rozin, Optical Access
  *
  *                     All Rights Reserved
  *
@@ -8,7 +8,7 @@
  * provided that the above copyright notice appear in all copies and that
  * both that copyright notice and this permission notice appear in
  * supporting documentation.
- * 
+ *
  * ALEX ROZIN DISCLAIM ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING
  * ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS, IN NO EVENT SHALL
  * ALEX ROZIN BE LIABLE FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR
@@ -27,14 +27,13 @@
 
 #ifndef OPTICALL_ACESS          /* in OpticalAccess case : find them in ~agent/mibgroup/nbase directory */
 void
-ag_trace(const char *format, ...)
-{
+ag_trace(const char *format, ...) {
 #define AG_MAX_MSG_LEN  120
     char            msg[AG_MAX_MSG_LEN];
     va_list         args;
 
     /*
-     * create msg 
+     * create msg
      */
     va_start(args, format);
     vsnprintf(msg, AG_MAX_MSG_LEN - 1, format, args);
@@ -45,12 +44,12 @@ ag_trace(const char *format, ...)
 
 int
 AGUTIL_advance_index_name(struct variable *vp, oid * name,
-                          size_t * length, int exact)
-{
+                          size_t * length, int exact) {
     int             result;
 
-    if (exact)
+    if (exact) {
         return 0;
+    }
 
     if (*length <= vp->namelen) {
         result =
@@ -60,13 +59,13 @@ AGUTIL_advance_index_name(struct variable *vp, oid * name,
         *length = vp->namelen;
     } else {
         /*
-         * If the name is given with indexes - compare only the oids. 
+         * If the name is given with indexes - compare only the oids.
          */
         result =
             snmp_oid_compare(name, (int) vp->namelen, vp->name,
                              (int) vp->namelen);
         /*
-         * If it's not the same oid - change name to the new oid 
+         * If it's not the same oid - change name to the new oid
          */
         if (result < 0) {
             memcpy((char *) name, (char *) vp->name,
@@ -100,8 +99,7 @@ AGUTIL_advance_index_name(struct variable *vp, oid * name,
 int
 AGUTIL_get_int_value(u_char * var_val, u_char var_val_type,
                      size_t var_val_len, long min_value, long max_value,
-                     long *long_tmp)
-{
+                     long *long_tmp) {
     if (var_val_type != ASN_INTEGER && var_val_type != ASN_TIMETICKS) {
         ag_trace("not ASN_INTEGER 0x%lx", (long) var_val_type);
         return SNMP_ERR_WRONGTYPE;
@@ -149,8 +147,7 @@ int
 AGUTIL_get_string_value(u_char * var_val, u_char var_val_type,
                         size_t var_val_len, size_t buffer_max_size,
                         u_char should_zero_limited,
-                        size_t * buffer_actual_size, char *buffer)
-{
+                        size_t * buffer_actual_size, char *buffer) {
     if (var_val_type != ASN_OCTET_STR) {
         ag_trace("not ASN_OCTET_STR 0x%lx", (long) var_val_type);
         return SNMP_ERR_WRONGTYPE;
@@ -161,14 +158,16 @@ AGUTIL_get_string_value(u_char * var_val, u_char var_val_type,
         return SNMP_ERR_WRONGLENGTH;
     }
 
-    if (buffer_actual_size)
+    if (buffer_actual_size) {
         *buffer_actual_size = var_val_len;
+    }
 
     memcpy(buffer, var_val, var_val_len);
     if (should_zero_limited) {
         buffer[var_val_len] = 0;
-        if (buffer_actual_size)
+        if (buffer_actual_size) {
             *buffer_actual_size += 1;
+        }
     }
 
     return SNMP_ERR_NOERROR;
@@ -178,8 +177,7 @@ AGUTIL_get_string_value(u_char * var_val, u_char var_val_type,
 
 int
 AGUTIL_get_oid_value(u_char * var_val, u_char var_val_type,
-                     size_t var_val_len, VAR_OID_T * data_source_ptr)
-{
+                     size_t var_val_len, VAR_OID_T * data_source_ptr) {
     register int    iii;
     register oid   *oid_var;
 
@@ -191,30 +189,41 @@ AGUTIL_get_oid_value(u_char * var_val, u_char var_val_type,
     var_val_len /= sizeof(oid);
     data_source_ptr->length = var_val_len;
     oid_var = (oid *) var_val;
-    for (iii = 0; iii < (int)data_source_ptr->length; iii++)
+    for (iii = 0; iii < (int)data_source_ptr->length; iii++) {
         data_source_ptr->objid[iii] = oid_var[iii];
+    }
 
     return SNMP_ERR_NOERROR;
 }
 
 u_long
-AGUTIL_sys_up_time(void)
-{
+AGUTIL_sys_up_time(void) {
     return netsnmp_get_agent_runtime();
 }
+
+#if defined(linux)
+#include "etherstats_linux.c"
+#endif
 
 /*
  * NOTE: this function is a template for system dependent
  * implementation. Actually it (in debug purposes) returns
  * random (but likely) data */
 void
-SYSTEM_get_eth_statistics(VAR_OID_T * data_source, ETH_STATS_T * where)
-{
+SYSTEM_get_eth_statistics(VAR_OID_T * data_source, ETH_STATS_T * where) {
+
 #if OPTICALL_ACESS
     where->ifIndex = data_source->objid[data_source->length - 1];
     agent_get_Rmon_ethernet_statistics(where->ifIndex, 1,       /* exact */
                                        where);
-#else                           /* OPTICALL_ACESS */
+#elif defined(linux)
+    // get ifName from ifIndex and update the stats values.
+    // NOTE: we ignore the result!
+    where->ifIndex = data_source->objid[data_source->length - 1];
+    (void) etherStatsTable_entry_load(where, where->ifIndex);
+
+#else                               /* not OPTICALL_ACESS and not linux */
+
     static ETH_STATS_T prev = { -1, -1 };
     static time_t   ifLastRead = 0;
     time_t          curr_time;
@@ -229,14 +238,16 @@ SYSTEM_get_eth_statistics(VAR_OID_T * data_source, ETH_STATS_T * where)
     }
 
     if (need_to_read) {
-        rc = (u_long) (1.0 +
-                       ((double) rand() / (double) RAND_MAX) * 100.0);
+        rc = (u_long)(1.0 +
+                      ((double) rand() / (double) RAND_MAX) * 100.0);
         ifLastRead = time(NULL);
         prev.ifIndex = where->ifIndex;
-    } else
+    } else {
         rc = 0;
+    }
 
     memcpy(where, &prev, sizeof(ETH_STATS_T));
+    where->etherStatsDropEvents += rc / 8;
     where->octets += rc * 100 * 200;
     where->packets += rc * 100;
     where->bcast_pkts += rc * 2;
@@ -259,41 +270,37 @@ SYSTEM_get_eth_statistics(VAR_OID_T * data_source, ETH_STATS_T * where)
     memcpy(&prev, where, sizeof(ETH_STATS_T));
     prev.ifIndex = need_to_read;
 #endif                          /* OPTICALL_ACESS */
+
 }
 
 #if 0                           /* for memory debug */
 static u_long   dbg_mem_cnt = 0;
 
 void           *
-dbg_f_AGMALLOC(size_t size)
-{
+dbg_f_AGMALLOC(size_t size) {
     dbg_mem_cnt++;
     return malloc(size);
 }
 
 void
-dbg_f_AGFREE(void *ptr)
-{
+dbg_f_AGFREE(void *ptr) {
     dbg_mem_cnt--;
     free(ptr);
 }
 
 char           *
-dbg_f_AGSTRDUP(const char *s)
-{
+dbg_f_AGSTRDUP(const char *s) {
     dbg_mem_cnt++;
     return strdup(s);
 }
 
 void
-dbg_f_AG_MEM_REPORT(void)
-{
+dbg_f_AG_MEM_REPORT(void) {
     ag_trace("dbg_mem_cnt=%ld", (long) dbg_mem_cnt);
 }
 
 #endif
 
 void
-init_agutil(void)
-{
+init_agutil(void) {
 }

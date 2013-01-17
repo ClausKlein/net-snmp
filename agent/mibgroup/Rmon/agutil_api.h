@@ -68,6 +68,7 @@ u_long          AGUTIL_sys_up_time(void);
 #else
 typedef struct {
     u_int           ifIndex;
+    u_long          etherStatsDropEvents;    // FIXME: was missing! ck
     u_long          octets;
     u_long          packets;
     u_long          bcast_pkts;

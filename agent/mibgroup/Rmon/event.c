@@ -283,6 +283,10 @@ write_eventControl(int action, u_char * var_val, u_char var_val_type,
         long_temp = name[eventEntryFirstIndexBegin];
         leaf_id = (int) name[eventEntryFirstIndexBegin - 1];
         hdr = ROWAPI_find(table_ptr, long_temp);        /* it MUST be OK */
+        if (!hdr) {
+            ag_trace("cannot find it leaf_id=%d\n", leaf_id);
+            return SNMP_ERR_NOSUCHNAME;
+        }
         cloned_body = (CRTL_ENTRY_T *) hdr->tmp;
         switch (leaf_id) {
         case Leaf_event_index:

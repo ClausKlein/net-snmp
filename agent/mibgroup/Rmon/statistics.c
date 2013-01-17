@@ -346,7 +346,7 @@ var_etherStatsEntry(struct variable * vp, oid * name, size_t * length,
         *var_len = sizeof(oid) * theEntry.data_source.length;
         return (unsigned char *) theEntry.data_source.objid;
     case IDetherStatsDropEvents:
-        long_return = 0;        /* theEntry.eth.etherStatsDropEvents; */
+        long_return = theEntry.eth.etherStatsDropEvents;
         return (u_char *) & long_return;
     case IDetherStatsOctets:
         long_return = theEntry.eth.octets;

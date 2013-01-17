@@ -14,7 +14,7 @@
 #Default: 1
 
 TSTIF=1
-COMPAR="-m ALL localhost public"
+COMPAR="-m +RMON2-MIB -v3 localhost "
 
 if [ "X"${1} = "X" ] ; then
     echo got default parameter : $TSTIF
@@ -23,33 +23,44 @@ else
 fi
 
 #testing parameters:
-ETHIND=3
+ETHIND=1
 EVNIND=7
 ALRIND=2
 LOWLIMIT=4800
-HILIMIT =4900
+HILIMIT=4900
 INTERVAL=3
 WAITTIME=17
 
 echo interface ifIndex.$TSTIF will be tested
 
+###FIXME bus error at write_etherStatsEntry()
+snmpset $COMPAR etherStatsStatus.1 i 4 \
+            etherStatsDataSource.2 o interfaces.ifTable.ifEntry.ifIndex.2
+
+for s in $(seq 4 -1 1); do
+    snmpset $COMPAR etherStatsStatus.$s i $s \
+        etherStatsDataSource.5 o interfaces.ifTable.ifEntry.ifIndex.2
+done
+
 echo " "
-echo 1. Create etherStatsEntry
+echo 1. Create etherStatsEntry  # createRequest(2)
 snmpset $COMPAR \
 	etherStatsStatus.$ETHIND i 2 \
 	etherStatsDataSource.$ETHIND o interfaces.ifTable.ifEntry.ifIndex.$TSTIF
-snmpset $COMPAR etherStatsStatus.$ETHIND i 1
+snmpset $COMPAR etherStatsStatus.$ETHIND i 1    # valid(1)
 snmpwalk $COMPAR statistics
+snmptable -Cibw 80 $COMPAR etherStatsTable
+snmptable -Cibw 80 $COMPAR etherStats2Table
 
-echo 2. Create event control entry
+echo 2. Create event control entry: # valid(1) logandtrap(4)
 snmpset $COMPAR \
 	eventStatus.$EVNIND i 1 \
 	eventDescription.$EVNIND s "Alarms" \
 	eventType.$EVNIND i 4 \
 	eventOwner.$EVNIND s "Alex"
-#snmpwalk $COMPAR eventTable
+snmptable -Cibw 80 $COMPAR eventTable
 
-echo 3. Create alarm entry
+echo 3. Create alarm entry: # valid(1) deltaValue(2)
 snmpset $COMPAR \
 	alarmStatus.$ALRIND i 1 \
 	alarmInterval.$ALRIND i $INTERVAL \
@@ -59,21 +70,22 @@ snmpset $COMPAR \
 	alarmRisingThreshold.$ALRIND i $HILIMIT \
 	alarmRisingEventIndex.$ALRIND i $EVNIND \
 	alarmFallingEventIndex.$ALRIND i $EVNIND
-snmpwalk $COMPAR alarm
+snmptable -Cibw 80 $COMPAR alarmTable
 
 echo 4. Sleep $WAITTIME to collect log.
 echo    This $WAITTIME seconds you may enjoy with Rmon traps.
 sleep $WAITTIME
 
 echo 5. Check log:
-snmpwalk $COMPAR logTable
-snmptable $COMPAR logTable
-snmpwalk $COMPAR eventTable
+# snmpwalk $COMPAR logTable
+snmptable -Cibw 80 $COMPAR logTable
+snmptable -Cibw 80 $COMPAR eventTable
 
-echo 6.  clean everything
+echo 6.  clean everything: # set to invalid(4)
 snmpset $COMPAR alarmStatus.$ALRIND i 4
 snmpset $COMPAR eventStatus.$EVNIND i 4
 snmpset $COMPAR etherStatsStatus.$ETHIND i 4
+snmpset $COMPAR etherStatsStatus.2 i 4
 snmpwalk $COMPAR rmon
 	
 echo " "
