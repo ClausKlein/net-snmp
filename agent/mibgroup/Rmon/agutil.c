@@ -218,6 +218,10 @@ AGUTIL_sys_up_time(void)
     return delta.tv_sec * 100 + delta.tv_usec / 10000;
 }
 
+#if defined(linux)
+#include "etherstats_linux.c"
+#endif
+
 /*
  * NOTE: this function is a template for system dependent
  * implementation. Actually it (in debug purposes) returns
@@ -229,7 +233,13 @@ SYSTEM_get_eth_statistics(VAR_OID_T * data_source, ETH_STATS_T * where)
     where->ifIndex = data_source->objid[data_source->length - 1];
     agent_get_Rmon_ethernet_statistics(where->ifIndex, 1,       /* exact */
                                        where);
-#else                           /* OPTICALL_ACESS */
+#elif defined(linux)
+    // get ifName from ifIndex and update the stats values.
+    // NOTE: we ignore the result!
+    where->ifIndex = data_source->objid[data_source->length - 1];
+    (void) etherStatsTable_entry_load(where, where->ifIndex);
+
+#else                           /* not OPTICALL_ACESS and not linux */
     static ETH_STATS_T prev = { -1, -1 };
     static time_t   ifLastRead = 0;
     time_t          curr_time;
@@ -253,6 +263,7 @@ SYSTEM_get_eth_statistics(VAR_OID_T * data_source, ETH_STATS_T * where)
     }
 
     memcpy(where, &prev, sizeof(ETH_STATS_T));
+    where->etherStatsDropEvents += rc / 8;
     where->octets += rc * 100 * 200;
     where->packets += rc * 100;
     where->bcast_pkts += rc * 2;
