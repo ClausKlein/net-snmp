@@ -506,6 +506,7 @@ handle_master_agentx_packet(int operation,
         close_agentx_session(session, -1);
         return 1;
     } else if (operation != NETSNMP_CALLBACK_OP_RECEIVED_MESSAGE) {
+        //FIXME NETSNMP_CALLBACK_OP_CONNECT was seen! ck
         DEBUGMSGTL(("agentx/master", "unexpected callback op %d\n",
                     operation));
         return 1;

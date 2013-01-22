@@ -144,6 +144,8 @@ static void     _init_snmp(void);
 
 #include "../agent/mibgroup/agentx/protocol.h"
 #include <net-snmp/library/transform_oids.h>
+
+/* see too /usr/include/sys/time.h */
 #ifndef timercmp
 #define	timercmp(tvp, uvp, cmp) \
 	/* CSTYLED */ \
@@ -154,6 +156,9 @@ static void     _init_snmp(void);
 #endif
 #ifndef timerclear
 #define	timerclear(tvp)		(tvp)->tv_sec = (tvp)->tv_usec = 0
+#endif
+#ifndef timerisset
+#define	timerisset(tvp)		((tvp)->tv_sec || (tvp)->tv_usec)
 #endif
 
 /*
@@ -2795,7 +2800,6 @@ _snmp_build(u_char ** pkt, size_t * pkt_len, size_t * offset,
     int             rc = 0;
 #endif /* support for community based SNMP */
     
-    u_char         *h0, *h1;
     u_char         *cp;
     size_t          length;
 
@@ -2921,7 +2925,6 @@ _snmp_build(u_char ** pkt, size_t * pkt_len, size_t * offset,
      * upto the PDU sequence
      * (note that actual length of message will be inserted later) 
      */
-    h0 = *pkt;
     switch (pdu->version) {
 #ifndef NETSNMP_DISABLE_SNMPV1
     case SNMP_VERSION_1:
@@ -3099,7 +3102,6 @@ _snmp_build(u_char ** pkt, size_t * pkt_len, size_t * offset,
         return -1;
     }
 
-    h1 = cp;
     DEBUGPRINTPDUTYPE("send", pdu->command);
     cp = snmp_pdu_build(pdu, cp, pkt_len);
     DEBUGINDENTADD(-4);         /* return from entire v1/v2c message */
