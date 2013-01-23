@@ -12,7 +12,7 @@ config_require(mibII/system_mib)
          char           *OR_descr;
          oid            *OR_oid;
          size_t          OR_oidlen;
-         struct timeval  OR_uptime;
+         u_long          OR_uptime;
          netsnmp_session *OR_sess;
          struct sysORTable *next;
      };
