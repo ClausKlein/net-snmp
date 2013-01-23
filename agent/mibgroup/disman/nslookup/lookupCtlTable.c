@@ -475,9 +475,9 @@ run_lookup(struct lookupTable_data *item)
             return;
         }
 
-        gettimeofday(&tpstart, NULL);
+        netsnmp_get_monotonic_clock(&tpstart);
         lookup = gethostbyaddr((char *) &addr_in, 4, AF_INET);
-        gettimeofday(&tpend, NULL);
+        netsnmp_get_monotonic_clock(&tpend);
         timeuse = 1000000 * (tpend.tv_sec - tpstart.tv_sec) +
             tpend.tv_usec - tpstart.tv_usec;
         timeuse /= 1000;
@@ -604,9 +604,9 @@ run_lookup(struct lookupTable_data *item)
 
     else if (addressType == 16) {
 
-        gettimeofday(&tpstart, NULL);
+        netsnmp_get_monotonic_clock(&tpstart);
         lookup = gethostbyname(address);
-        gettimeofday(&tpend, NULL);
+        netsnmp_get_monotonic_clock(&tpend);
         timeuse4 = 1000000 * (tpend.tv_sec - tpstart.tv_sec) +
             tpend.tv_usec - tpstart.tv_usec;
         timeuse4 /= 1000;
@@ -679,9 +679,9 @@ run_lookup(struct lookupTable_data *item)
         char            pa[64];
         char           *hostname = NULL;
 
-        gettimeofday(&tpstart, NULL);
+        netsnmp_get_monotonic_clock(&tpstart);
         hp = gethostbyname2(address, AF_INET6);
-        gettimeofday(&tpend, NULL);
+        netsnmp_get_monotonic_clock(&tpend);
         timeuse6 = 1000000 * (tpend.tv_sec - tpstart.tv_sec) +
             tpend.tv_usec - tpstart.tv_usec;
         timeuse6 /= 1000;
@@ -779,9 +779,9 @@ run_lookup(struct lookupTable_data *item)
             DEBUGMSGTL(("lookupCtlTable", "error! \n"));
 
 
-        gettimeofday(&tpstart, NULL);
+        netsnmp_get_monotonic_clock(&tpstart);
         lookup = gethostbyaddr((char *) &addr_in6, 16, AF_INET6);
-        gettimeofday(&tpend, NULL);
+        netsnmp_get_monotonic_clock(&tpend);
         timeuse = 1000000 * (tpend.tv_sec - tpstart.tv_sec) +
             tpend.tv_usec - tpstart.tv_usec;
         timeuse /= 1000;

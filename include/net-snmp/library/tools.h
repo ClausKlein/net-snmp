@@ -121,25 +121,26 @@ extern          "C" {
 		goto l ;		\
 	}
 
-    /*
-     * DIFFTIMEVAL
-     *      Set <diff> to the difference between <now> (current) and <then> (past).
-     *
-     * ASSUMES that all inputs are (struct timeval)'s.
-     * Cf. system.c:calculate_time_diff().
-     */
-#define DIFFTIMEVAL(now, then, diff) 			\
-{							\
-	now.tv_sec--;					\
-	now.tv_usec += 1000000L;			\
-	diff.tv_sec  = now.tv_sec  - then.tv_sec;	\
-	diff.tv_usec = now.tv_usec - then.tv_usec;	\
-	if (diff.tv_usec > 1000000L){			\
-		diff.tv_usec -= 1000000L;		\
-		diff.tv_sec++;				\
-	}						\
+
+#define NETSNMP_TIMERADD(a, b, res)                  \
+{                                                    \
+    (res)->tv_sec  = (a)->tv_sec  + (b)->tv_sec;     \
+    (res)->tv_usec = (a)->tv_usec + (b)->tv_usec;    \
+    if ((res)->tv_usec >= 1000000L) {                \
+        (res)->tv_usec -= 1000000L;                  \
+        (res)->tv_sec++;                             \
+    }                                                \
 }
 
+#define NETSNMP_TIMERSUB(a, b, res)                             \
+{                                                               \
+    (res)->tv_sec  = (a)->tv_sec  - (b)->tv_sec - 1;            \
+    (res)->tv_usec = (a)->tv_usec - (b)->tv_usec + 1000000L;    \
+    if ((res)->tv_usec >= 1000000L) {                           \
+        (res)->tv_usec -= 1000000L;                             \
+        (res)->tv_sec++;                                        \
+    }                                                           \
+}
 
     /*
      * ISTRANSFORM
@@ -153,7 +154,6 @@ extern          "C" {
 
 #define ENGINETIME_MAX	2147483647      /* ((2^31)-1) */
 #define ENGINEBOOT_MAX	2147483647      /* ((2^31)-1) */
-
 
 
 
@@ -199,8 +199,11 @@ extern          "C" {
     char           *dump_snmpEngineID(const u_char * buf, size_t * buflen);
 
     typedef void   *marker_t;
+    typedef const void* const_marker_t;
     marker_t        atime_newMarker(void);
     void            atime_setMarker(marker_t pm);
+    void            netsnmp_get_monotonic_clock(struct timeval* tv);
+    void            netsnmp_set_monotonic_marker(marker_t *pm);
     long            atime_diff(marker_t first, marker_t second);
     u_long          uatime_diff(marker_t first, marker_t second);       /* 1/1000th sec */
     u_long          uatime_hdiff(marker_t first, marker_t second);      /* 1/100th sec */

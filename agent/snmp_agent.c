@@ -130,7 +130,7 @@ enum {
 struct addrCache {
     char           *addr;
     int            status;
-    struct timeval lastHit;
+    struct timeval lastHitM;
 };
 
 static struct addrCache addrCache[SNMP_ADDRCACHE_SIZE];
@@ -593,8 +593,7 @@ agent_check_and_process(int block)
          * The caller does not want us to block at all.  
          */
 
-        tvp->tv_sec = 0;
-        tvp->tv_usec = 0;
+        timerclear(tvp);
     }
 
     count = select(numfds, &fdset, 0, 0, tvp);
@@ -618,6 +617,11 @@ agent_check_and_process(int block)
             snmp_log(LOG_ERR, "select returned %d\n", count);
             return -1;
         }                       /* endif -- count>0 */
+
+    /*
+     * see if persistent store needs to be saved
+     */
+    //FIXME snmp_store_if_needed();
 
     /*
      * Run requested alarms.  
@@ -684,7 +688,7 @@ netsnmp_addrcache_add(const char *addr)
     /*
      * First get the current and oldest allowable timestamps
      */
-    gettimeofday(&now, (struct timezone*) NULL);
+    netsnmp_get_monotonic_clock(&now);
     aged.tv_sec = now.tv_sec - SNMP_ADDRCACHE_MAXAGE;
     aged.tv_usec = now.tv_usec;
 
@@ -704,8 +708,8 @@ netsnmp_addrcache_add(const char *addr)
                 /*
                  * found a match
                  */
-                memcpy(&addrCache[i].lastHit, &now, sizeof(struct timeval));
-                if (timercmp(&addrCache[i].lastHit, &aged, <))
+                addrCache[i].lastHitM = now;
+                if (timercmp(&addrCache[i].lastHitM, &aged, <))
 		    rc = 1; /* should have expired, so is new */
 		else
 		    rc = 0; /* not expired, so is existing entry */
@@ -715,7 +719,7 @@ netsnmp_addrcache_add(const char *addr)
                 /*
                  * Used, but not this address. check if it's stale.
                  */
-                if (timercmp(&addrCache[i].lastHit, &aged, <)) {
+                if (timercmp(&addrCache[i].lastHitM, &aged, <)) {
                     /*
                      * Stale, reuse
                      */
@@ -733,8 +737,8 @@ netsnmp_addrcache_add(const char *addr)
                      */
                     if (oldest < 0)
                         oldest = i;
-                    else if (timercmp(&addrCache[i].lastHit,
-                                      &addrCache[oldest].lastHit, <))
+                    else if (timercmp(&addrCache[i].lastHitM,
+                                      &addrCache[oldest].lastHitM, <))
                         oldest = i;
                 } /* fresh */
             } /* used, no match */
@@ -751,7 +755,7 @@ netsnmp_addrcache_add(const char *addr)
              */
             addrCache[unused].addr = strdup(addr);
             addrCache[unused].status = SNMP_ADDRCACHE_USED;
-            memcpy(&addrCache[unused].lastHit, &now, sizeof(struct timeval));
+            addrCache[unused].lastHitM = now;
         }
         else { /* Otherwise, replace oldest entry */
             if (netsnmp_ds_get_boolean(NETSNMP_DS_APPLICATION_ID,
@@ -761,7 +765,7 @@ netsnmp_addrcache_add(const char *addr)
             
             free(addrCache[oldest].addr);
             addrCache[oldest].addr = strdup(addr);
-            memcpy(&addrCache[oldest].lastHit, &now, sizeof(struct timeval));
+            addrCache[oldest].lastHitM = now;
         }
         rc = 1;
     }
@@ -3552,42 +3556,131 @@ netsnmp_request_set_error_all( netsnmp_request_info *requests, int error)
     return result;
 }
 
-extern struct timeval starttime;
+const_marker_t netsnmp_get_agent_starttime(void);
 
-                /*
-                 * Return the value of 'sysUpTime' at the given marker 
-                 */
+/**
+ * Return the difference between pm and the agent start time in hundredths of
+ * a second.
+ * \deprecated Don't use in new code.
+ *
+ * @param[in] pm An absolute time as e.g. reported by gettimeofday().
+ */
 u_long
 netsnmp_marker_uptime(marker_t pm)
 {
     u_long          res;
-    marker_t        start = (marker_t) & starttime;
+    const_marker_t  start = netsnmp_get_agent_starttime();
 
     res = uatime_hdiff(start, pm);
-    return res;                 /* atime_diff works in msec, not csec */
+    return res;
 }
 
-                        /*
-                         * struct timeval equivalents of these 
-                         */
+/**
+ * Return the difference between tv and the agent start time in hundredths of
+ * a second.
+ *
+ * \deprecated Use netsnmp_get_agent_uptime() instead.
+ *
+ * @param[in] tv An absolute time as e.g. reported by gettimeofday().
+ */
 u_long
 netsnmp_timeval_uptime(struct timeval * tv)
 {
     return netsnmp_marker_uptime((marker_t) tv);
 }
 
-                /*
-                 * Return the current value of 'sysUpTime' 
-                 */
+
+// FIXME ld: duplicate symbol _starttime in .libs/snmp_vars.o and .libs/snmp_agent.o for architecture i386
+static struct timeval  starttime;
+static struct timeval starttimeM;
+
+/**
+ * Return a pointer to the variable in which the Net-SNMP start time has
+ * been stored.
+ *
+ * @note Use netsnmp_get_agent_runtime() instead of this function if you need
+ *   to know how much time elapsed since netsnmp_set_agent_starttime() has been
+ *   called.
+ */
+const_marker_t
+netsnmp_get_agent_starttime(void)
+{
+    return &starttime;
+}
+
+/**
+ * Report the time that elapsed since the agent start time in hundredths of a
+ * second.
+ *
+ * @see See also netsnmp_set_agent_starttime().
+ */
+uint64_t
+netsnmp_get_agent_runtime(void)
+{
+    struct timeval now, delta;
+
+    netsnmp_get_monotonic_clock(&now);
+    NETSNMP_TIMERSUB(&now, &starttimeM, &delta);
+    return delta.tv_sec * (uint64_t)100 + delta.tv_usec / 10000;
+}
+
+/**
+ * Set the time at which Net-SNMP started either to the current time
+ * (if s == NULL) or to *s (if s is not NULL).
+ *
+ * @see See also netsnmp_set_agent_uptime().
+ */
+void
+netsnmp_set_agent_starttime(marker_t s)
+{
+    if (s) {
+        struct timeval nowA, nowM;
+
+        starttime = *(struct timeval*)s;
+        gettimeofday(&nowA, NULL);
+        netsnmp_get_monotonic_clock(&nowM);
+        NETSNMP_TIMERSUB(&starttime, &nowA, &starttimeM);
+        NETSNMP_TIMERADD(&starttimeM, &nowM, &starttimeM);
+    } else {
+        gettimeofday(&starttime, NULL);
+        netsnmp_get_monotonic_clock(&starttimeM);
+    }
+}
+
+
+/**
+ * Return the current value of 'sysUpTime'
+ */
 u_long
 netsnmp_get_agent_uptime(void)
 {
-    struct timeval  now;
-    gettimeofday(&now, NULL);
+    struct timeval now, delta;
 
-    return netsnmp_timeval_uptime(&now);
+    netsnmp_get_monotonic_clock(&now);
+    NETSNMP_TIMERSUB(&now, &starttimeM, &delta);
+    return delta.tv_sec * 100UL + delta.tv_usec / 10000;
 }
 
+/**
+ * Set the start time from which 'sysUpTime' is computed.
+ *
+ * @param[in] hsec New sysUpTime in hundredths of a second.
+ *
+ * @see See also netsnmp_set_agent_starttime().
+ */
+void
+netsnmp_set_agent_uptime(u_long hsec)
+{
+    struct timeval  nowA, nowM;
+    struct timeval  new_uptime;
+
+    gettimeofday(&nowA, NULL);
+    netsnmp_get_monotonic_clock(&nowM);
+    new_uptime.tv_sec = hsec / 100;
+    new_uptime.tv_usec = (uint32_t)(hsec - new_uptime.tv_sec * 100) * 10000L;
+    NETSNMP_TIMERSUB(&nowA, &new_uptime, &starttime);
+    NETSNMP_TIMERSUB(&nowM, &new_uptime, &starttimeM);
+}
 
 
 NETSNMP_INLINE void

@@ -100,18 +100,6 @@ static size_t   defaultAuthTypeLen = 0;
 static const oid *defaultPrivType = NULL;
 static size_t   defaultPrivTypeLen = 0;
 
-/* this is probably an over-kill ifdef, but why not */
-#if defined(HAVE_SYS_TIMES_H) && defined(HAVE_UNISTD_H) && defined(HAVE_TIMES) && defined(_SC_CLK_TCK) && defined(HAVE_SYSCONF) && defined(UINT_MAX)
-
-#define SNMP_USE_TIMES 1
-
-static clock_t snmpv3startClock;
-static long clockticks = 0;
-static unsigned int lastcalltime = 0;
-static unsigned int wrapcounter = 0;
-
-#endif /* times() tests */
-
 #if defined(IFHWADDRLEN) && defined(SIOCGIFHWADDR)
 static int      getHwAddress(const char *networkDevice, char *addressOut);
 #endif
@@ -1232,19 +1220,7 @@ get_enginetime_alarm(unsigned int regnum, void *clientargs)
 void
 init_snmpv3(const char *type)
 {
-#if SNMP_USE_TIMES
-  struct tms dummy;
-
-  /* fixme: -1 is fault code... */
-  snmpv3startClock = times(&dummy);
-
-  /* remember how many ticks per second there are, since times() returns this */
-
-  clockticks = sysconf(_SC_CLK_TCK);
-
-#endif /* SNMP_USE_TIMES */
-
-    gettimeofday(&snmpv3starttime, NULL);
+    netsnmp_get_monotonic_clock(&snmpv3starttime);
 
     if (!type)
         type = "__snmpapp__";
@@ -1661,18 +1637,17 @@ getHwAddress(const char *networkDevice, /* e.g. "eth0", "eth1" */
 #endif
 
 #ifdef NETSNMP_ENABLE_TESTING_CODE
-/*
- * snmpv3_set_engineBootsAndTime(): this function does not exist.  Go away. 
- */
-/*
- * It certainly should never be used, unless in a testing scenero,
- * which is why it was created 
+/**
+ * Set SNMPv3 engineBoots and start time.
+ *
+ * @note This function does not exist. Go away. It certainly should never be
+ *   used, unless in a testing scenario, which is why it was created
  */
 void
 snmpv3_set_engineBootsAndTime(int boots, int ttime)
 {
     engineBoots = boots;
-    gettimeofday(&snmpv3starttime, NULL);
+    netsnmp_get_monotonic_clock(&snmpv3starttime);
     snmpv3starttime.tv_sec -= ttime;
 }
 #endif

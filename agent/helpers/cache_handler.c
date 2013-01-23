@@ -372,10 +372,11 @@ netsnmp_cache_check_expired(netsnmp_cache *cache)
     if(NULL == cache)
         return 0;
     
-    if(!cache->valid || (NULL == cache->timestamp) || (-1 == cache->timeout))
+    if(!cache->valid || (NULL == cache->timestampM) || (-1 == cache->timeout))
         cache->expired = 1;
     else
-        cache->expired = atime_ready(cache->timestamp, 1000 * cache->timeout);
+        cache->expired = netsnmp_ready_monotonic(cache->timestampM,
+                                                 1000 * cache->timeout);
     
     return cache->expired;
 }
@@ -559,10 +560,7 @@ _cache_load( netsnmp_cache *cache )
                             0, release_cached_resources, NULL);
         cache_outstanding_valid = 1;
     }
-    if (cache->timestamp)
-        atime_setMarker(cache->timestamp);
-    else
-        cache->timestamp = atime_newMarker();
+    netsnmp_set_monotonic_marker(&cache->timestampM);
     DEBUGMSGT(("helper:cache_handler", " loaded (%d)\n", cache->timeout));
 
     return ret;

@@ -48,9 +48,6 @@
 #include "mibII/sysORTable.h"
 #include "master.h"
 
-extern struct timeval starttime;
-
-
 
 netsnmp_session *
 find_agentx_session(netsnmp_session * session, int sessid)
@@ -68,7 +65,6 @@ int
 open_agentx_session(netsnmp_session * session, netsnmp_pdu *pdu)
 {
     netsnmp_session *sp;
-    struct timeval  now;
 
     DEBUGMSGTL(("agentx/master", "open %08p\n", session));
     sp = (netsnmp_session *) malloc(sizeof(netsnmp_session));
@@ -108,8 +104,7 @@ open_agentx_session(netsnmp_session * session, netsnmp_pdu *pdu)
                                                  name_length);
     sp->securityAuthProtoLen = pdu->variables->name_length;
     sp->securityName = strdup((char *) pdu->variables->val.string);
-    gettimeofday(&now, NULL);
-    sp->engineTime = calculate_time_diff(&now, &starttime);
+    sp->engineTime = (uint32_t)((netsnmp_get_agent_runtime() + 50) / 100) & 0x7fffffffL;
 
     sp->subsession = session;   /* link back to head */
     sp->flags |= SNMP_FLAGS_SUBSESSION;
@@ -425,7 +420,6 @@ agentx_notify(netsnmp_session * session, netsnmp_pdu *pdu)
 {
     netsnmp_session *sp;
     netsnmp_variable_list *var;
-    int             got_sysuptime = 0;
     extern oid      sysuptime_oid[], snmptrap_oid[];
     extern size_t   sysuptime_oid_len, snmptrap_oid_len;
 
@@ -439,7 +433,6 @@ agentx_notify(netsnmp_session * session, netsnmp_pdu *pdu)
 
     if (snmp_oid_compare(var->name, var->name_length,
                          sysuptime_oid, sysuptime_oid_len) == 0) {
-        got_sysuptime = 1;
         var = var->next_variable;
     }
 
@@ -479,7 +472,6 @@ handle_master_agentx_packet(int operation,
                             int reqid, netsnmp_pdu *pdu, void *magic)
 {
     netsnmp_agent_session *asp;
-    struct timeval  now;
 
     if (operation == NETSNMP_CALLBACK_OP_DISCONNECT) {
         DEBUGMSGTL(("agentx/master",
@@ -492,6 +484,7 @@ handle_master_agentx_packet(int operation,
     } else if (operation != NETSNMP_CALLBACK_OP_RECEIVED_MESSAGE) {
         DEBUGMSGTL(("agentx/master", "unexpected callback op %d\n",
                     operation));
+        //XXX close_agentx_session(session, -1);  //FIXME in case of NETSNMP_CALLBACK_OP_CONNECT? ck
         return 1;
     }
 
@@ -577,8 +570,7 @@ handle_master_agentx_packet(int operation,
         break;
     }
 
-    gettimeofday(&now, NULL);
-    asp->pdu->time = calculate_time_diff(&now, &starttime);
+    asp->pdu->time = netsnmp_get_agent_uptime();
     asp->pdu->command = AGENTX_MSG_RESPONSE;
     asp->pdu->errstat = asp->status;
     DEBUGMSGTL(("agentx/master", "send response, stat %d (req=0x%x,trans="
