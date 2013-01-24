@@ -80,15 +80,17 @@
  * ipv6 include   
  */
 #include <sys/param.h>
-#include <linux/sockios.h>
 #include <sys/file.h>
 #include <sys/signal.h>
 #include <sys/ioctl.h>
 #include <net/if.h>
 #include <sys/poll.h>
-#include <linux/types.h>
 #include <ctype.h>
+#ifdef linux
+#include <linux/sockios.h>
+#include <linux/types.h>
 #include <linux/errqueue.h>
+#endif
 
 #include <sched.h>
 
@@ -297,16 +299,16 @@ struct proto {
     struct sockaddr *sarecv;    /* sockaddr{} for receiving */
     socklen_t       salen;      /* length of sockaddr{}s */
     int             icmpproto;  /* IPPROTO_xxx value for ICMP */
-}              *pr;
+};
 
 
 /*
  * ipv6 function 
  */
 
-#define BIT_CLEAR(nr, addr) do { ((__u32 *)(addr))[(nr) >> 5] &= ~(1U << ((nr) & 31)); } while(0)
-#define BIT_SET(nr, addr) do { ((__u32 *)(addr))[(nr) >> 5] |= (1U << ((nr) & 31)); } while(0)
-#define BIT_TEST(nr, addr) do { (__u32 *)(addr))[(nr) >> 5] & (1U << ((nr) & 31)); } while(0)
+#define BIT_CLEAR(nr, addr) do { ((uint32_t *)(addr))[(nr) >> 5] &= ~(1U << ((nr) & 31)); } while(0)
+#define BIT_SET(nr, addr) do { ((uint32_t *)(addr))[(nr) >> 5] |= (1U << ((nr) & 31)); } while(0)
+#define BIT_TEST(nr, addr) do { ((uint32_t *)(addr))[(nr) >> 5] & (1U << ((nr) & 31)); } while(0)
 
 #define ICMPV6_FILTER_WILLPASS(type, filterp) \
 	(BIT_TEST((type), filterp) == 0)
@@ -336,11 +338,6 @@ struct proto {
 
 
 #define	MAX_DUP_CHK	0x10000
-char            rcvd_tbl[MAX_DUP_CHK / 8];
-
-volatile int    exiting;
-volatile int    status_snapshot;
-
 #ifndef MSG_CONFIRM
 #define MSG_CONFIRM 0
 #endif
@@ -390,20 +387,20 @@ volatile int    status_snapshot;
 int             __schedule_exit(int, long *, long *);
 int             pinger(int, int, int, char *, struct sockaddr_in6 *, int *,
                        int, int, int, int, int, char *, int *, int *,
-                       int *, int *, __u16 *, long *, long *, long *,
+                       int *, int *, uint16_t *, long *, long *, long *,
                        long *, int *, int *, int *, struct timeval *);
 void            sock_setbufs(int, int, int);
 void            setup(int, int, int, int, int, int, int, char *, int *,
                       struct timeval *, int *, int *);
-void            main_loop(struct pingCtlTable_data *, int, int, __u8 *,
+void            main_loop(struct pingCtlTable_data *, int, int, uint8_t *,
                           int, int, char *, struct sockaddr_in6 *, int,
                           int, char *, int, int, int, int, char *, int *,
                           struct timeval *, int *, int *);
 int             gather_statistics(int *, struct pingCtlTable_data *,
-                                  __u8 *, int, __u16, int, int,
+                                  uint8_t *, int, uint16_t, int, int,
                                   struct timeval *, time_t, int *, int,
                                   int, char *, int, int, int, char *,
-                                  int *, __u16 *, long *, long *, long *,
+                                  int *, uint16_t *, long *, long *, long *,
                                   long *, long *, long *, long long *,
                                   long long *, int *, int *, int *,
                                   struct pingProbeHistoryTable_data *);
@@ -424,7 +421,7 @@ int             parse_reply(int *, struct pingCtlTable_data *,
                             struct msghdr *, int, void *, struct timeval *,
                             time_t, int, struct sockaddr_in6 *, int *, int,
                             int, int, int, int, char *, int *, int *,
-                            __u16 *, long *, long *, long *, long *,
+                            uint16_t *, long *, long *, long *, long *,
                             long *, long *, long *, long long *,
                             long long *, int *, int *, int *,
                             struct pingProbeHistoryTable_data *);
