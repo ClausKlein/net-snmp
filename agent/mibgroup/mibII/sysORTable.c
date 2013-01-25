@@ -59,7 +59,7 @@ static int
 _unregister_sysOR_by_session_callback(int majorID, int minorID,
                                       void *serverarg, void *clientarg);
 
-struct timeval  sysOR_lastchange;
+u_long sysOR_lastchange;
 static struct sysORTable *table = NULL;
 static int      numEntries = 0;
 
@@ -123,7 +123,7 @@ init_sysORTable(void)
                              "The MIB module for SNMPv2 entities");
 #endif
 
-    gettimeofday(&sysOR_lastchange, NULL);
+    sysOR_lastchange = netsnmp_get_agent_uptime();
 }
 
         /*********************
@@ -207,8 +207,8 @@ register_sysORTable_sess(oid * oidin,
         return SYS_ORTABLE_REGISTRATION_FAILED;
     }
     memcpy(ptr->OR_oid, oidin, sizeof(oid) * oidlen);
-    gettimeofday(&(ptr->OR_uptime), NULL);
-    gettimeofday(&(sysOR_lastchange), NULL);
+    sysOR_lastchange = netsnmp_get_agent_uptime();
+    ptr->OR_uptime = sysOR_lastchange;
     ptr->OR_sess = ss;
     ptr->next = NULL;
     numEntries++;
@@ -263,7 +263,7 @@ unregister_sysORTable_sess(oid * oidin,
             free(ptr->OR_descr);
             free(ptr);
             numEntries--;
-            gettimeofday(&(sysOR_lastchange), NULL);
+            sysOR_lastchange = netsnmp_get_agent_uptime();
             found = SYS_ORTABLE_UNREGISTERED_OK;
             break;
         } else
@@ -304,7 +304,7 @@ unregister_sysORTable_by_session(netsnmp_session * ss)
             free(ptr->OR_descr);
             free(ptr);
             numEntries--;
-            gettimeofday(&(sysOR_lastchange), NULL);
+            sysOR_lastchange = netsnmp_get_agent_uptime();
         } else
             prev = ptr;
     }

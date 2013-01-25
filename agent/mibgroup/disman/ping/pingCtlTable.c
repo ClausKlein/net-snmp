@@ -47,14 +47,18 @@
 
 static inline void tvsub(struct timeval *, struct timeval *);
 static inline int schedule_exit(int, int *, long *, long *, long *, long *);
-static inline int in_flight(__u16 *, long *, long *, long *);
-static inline void acknowledge(__u16, __u16 *, long *, int *);
-static inline void advance_ntransmitted(__u16 *, long *);
+static inline int in_flight(uint16_t *, long *, long *, long *);
+static inline void acknowledge(uint16_t, uint16_t *, long *, int *);
+static inline void advance_ntransmitted(uint16_t *, long *);
 static inline void update_interval(int, int, int *, int *);
 static long     llsqrt(long long);
 static __inline__ int ipv6_addr_any(struct in6_addr *);
 static char    *pr_addr(struct in6_addr *, int);
 static char    *pr_addr_n(struct in6_addr *);
+
+char            rcvd_tbl[MAX_DUP_CHK / 8];
+volatile int    exiting;
+volatile int    status_snapshot;
 
 /*
  *pingCtlTable_variables_oid:
@@ -1254,7 +1258,7 @@ readloop(struct pingCtlTable_data *item, struct addrinfo *ai, int datalen,
             flag = 0;
         }
 
-        gettimeofday(&tval, NULL);
+        netsnmp_get_monotonic_clock(&tval);
 
         time(&timep);
 
@@ -1578,7 +1582,7 @@ send_v4(int datalen, pid_t pid, int nsent, int sockfd, char *sendbuf)
     icmp->icmp_code = 0;
     icmp->icmp_id = pid;
     icmp->icmp_seq = nsent;
-    gettimeofday((struct timeval *) icmp->icmp_data, NULL);
+    netsnmp_get_monotonic_clock((struct timeval *) icmp->icmp_data);
 
     len = 8 + datalen;          /* checksum ICMP header and data */
     icmp->icmp_cksum = 0;
@@ -1684,7 +1688,7 @@ run_ping(unsigned int clientreg, void *clientarg)
         int             datalen = DEFDATALEN;
         int             timing = 0;     /* flag to do timing */
         int             working_recverr = 0;
-        __u32           flowlabel = 0;
+        uint32_t           flowlabel = 0;
 
         int             ident = 0;      /* process id to identify our packets */
         u_char          outpack[MAX_PACKET];
@@ -4351,36 +4355,36 @@ schedule_exit(int next, int *deadline, long *npackets, long *nreceived,
 }
 
 static inline int
-in_flight(__u16 * acked, long *nreceived, long *ntransmitted,
+in_flight(uint16_t * acked, long *nreceived, long *ntransmitted,
           long *nerrors)
 {
-    __u16           diff = (__u16) (*ntransmitted) - (*acked);
+    uint16_t           diff = (uint16_t) (*ntransmitted) - (*acked);
     return (diff <=
             0x7FFF) ? diff : (*ntransmitted) - (*nreceived) - (*nerrors);
 }
 
 static inline void
-acknowledge(__u16 seq, __u16 * acked, long *ntransmitted, int *pipesize)
+acknowledge(uint16_t seq, uint16_t * acked, long *ntransmitted, int *pipesize)
 {
-    __u16           diff = (__u16) (*ntransmitted) - seq;
+    uint16_t           diff = (uint16_t) (*ntransmitted) - seq;
     if (diff <= 0x7FFF) {
         if ((int) diff + 1 > (*pipesize))
             (*pipesize) = (int) diff + 1;
         if ((__s16) (seq - (*acked)) > 0 ||
-            (__u16) (*ntransmitted) - (*acked) > 0x7FFF)
+            (uint16_t) (*ntransmitted) - (*acked) > 0x7FFF)
             *acked = seq;
     }
 }
 
 static inline void
-advance_ntransmitted(__u16 * acked, long *ntransmitted)
+advance_ntransmitted(uint16_t * acked, long *ntransmitted)
 {
     (*ntransmitted)++;
     /*
      * Invalidate acked, if 16 bit seq overflows. 
      */
-    if ((__u16) (*ntransmitted) - (*acked) > 0x7FFF)
-        *acked = (__u16) (*ntransmitted) + 1;
+    if ((uint16_t) (*ntransmitted) - (*acked) > 0x7FFF)
+        *acked = (uint16_t) (*ntransmitted) + 1;
 }
 
 
@@ -4438,7 +4442,7 @@ int
 pinger(int icmp_sock, int preload, int cmsglen, char *cmsgbuf,
        struct sockaddr_in6 *whereto, int *rtt_addend, int options, int uid,
        int interval, int datalen, int timing, char *outpack, int *rtt,
-       int *ident, int *screen_width, int *deadline, __u16 * acked,
+       int *ident, int *screen_width, int *deadline, uint16_t * acked,
        long *npackets, long *nreceived, long *ntransmitted, long *nerrors,
        int *confirm_flag, int *confirm, int *pipesize,
        struct timeval *cur_time)
@@ -4460,14 +4464,13 @@ pinger(int icmp_sock, int preload, int cmsglen, char *cmsgbuf,
      * Check that packets < rate*time + preload 
      */
     if ((*cur_time).tv_sec == 0) {
-
-        gettimeofday(cur_time, NULL);
+        netsnmp_get_monotonic_clock(cur_time);
         tokens = interval * (preload - 1);
     } else {
         long            ntokens;
         struct timeval  tv;
 
-        gettimeofday(&tv, NULL);
+        netsnmp_get_monotonic_clock(&tv);
         ntokens = (tv.tv_sec - (*cur_time).tv_sec) * 1000 +
             (tv.tv_usec - (*cur_time).tv_usec) / 1000;
         if (!interval) {
@@ -4692,7 +4695,7 @@ setup(int icmp_sock, int options, int uid, int timeout, int preload,
 
     *ident = getpid() & 0xFFFF;
 
-    gettimeofday(start_time, NULL);
+    netsnmp_get_monotonic_clock(start_time);
 
 #if 0
     if (*deadline) {
@@ -4717,7 +4720,7 @@ setup(int icmp_sock, int options, int uid, int timeout, int preload,
 
 void
 main_loop(struct pingCtlTable_data *item, int icmp_sock, int preload,
-          __u8 * packet, int packlen, int cmsglen, char *cmsgbuf,
+          uint8_t * packet, int packlen, int cmsglen, char *cmsgbuf,
           struct sockaddr_in6 *whereto, int options, int uid,
           char *hostname, int interval, int datalen, int timing,
           int working_recverr, char *outpack, int *ident,
@@ -4734,7 +4737,7 @@ main_loop(struct pingCtlTable_data *item, int icmp_sock, int preload,
     int             rtt = 0;
     int             rtt_addend = 0;
 
-    __u16           acked = 0;
+    uint16_t           acked = 0;
     /*
      * counters 
      */
@@ -5019,7 +5022,7 @@ main_loop(struct pingCtlTable_data *item, int icmp_sock, int preload,
                 if ((options & F_LATENCY) || recv_timep == NULL) {
                     if ((options & F_LATENCY) ||
                         ioctl(icmp_sock, SIOCGSTAMP, &recv_time))
-                        gettimeofday(&recv_time, NULL);
+                        netsnmp_get_monotonic_clock(&recv_time);
                     recv_timep = &recv_time;
                 }
 
@@ -5092,12 +5095,12 @@ main_loop(struct pingCtlTable_data *item, int icmp_sock, int preload,
 }
 
 int
-gather_statistics(int *series, struct pingCtlTable_data *item, __u8 * ptr,
-                  int cc, __u16 seq, int hops, int csfailed,
+gather_statistics(int *series, struct pingCtlTable_data *item, uint8_t * ptr,
+                  int cc, uint16_t seq, int hops, int csfailed,
                   struct timeval *tv, time_t timep, int *rtt_addend,
                   int uid, int options, char *from, int interval,
                   int datalen, int timing, char *outpack, int *rtt,
-                  __u16 * acked, long *nreceived, long *nrepeats,
+                  uint16_t * acked, long *nreceived, long *nrepeats,
                   long *ntransmitted, long *nchecksum, long *tmin,
                   long *tmax, long long *tsum, long long *tsum2,
                   int *confirm_flag, int *confirm, int *pipesize,
@@ -5123,14 +5126,11 @@ gather_statistics(int *series, struct pingCtlTable_data *item, __u8 * ptr,
         tvsub(tv, &tmp_tv);
         triptime = tv->tv_sec * 1000000 + tv->tv_usec;
         if (triptime < 0) {
-            fprintf(stderr,
-                    "Warning: time of day goes back (%ldus), taking countermeasures.\n",
-                    triptime);
+            snmp_log(LOG_INFO,
+                     "Warning: invalid timestamp in ICMP response.\n");
             triptime = 0;
             if (!(options & F_LATENCY)) {
-                gettimeofday(tv, NULL);
                 options |= F_LATENCY;
-                goto restamp;
             }
         }
         if (!csfailed) {
@@ -5172,7 +5172,7 @@ gather_statistics(int *series, struct pingCtlTable_data *item, __u8 * ptr,
             write(STDOUT_FILENO, "\bC", 1);
     } else {
         int             i;
-        __u8           *cp, *dp;
+        uint8_t           *cp, *dp;
         printf("%d bytes from %s: icmp_seq=%u", cc, from, seq);
 
         if (hops >= 0)
@@ -5534,8 +5534,7 @@ send_v6(int icmp_sock, int cmsglen, char *cmsgbuf,
     CLR(icmph->icmp6_seq % mx_dup_ck);
 
     if (timing)
-        gettimeofday((struct timeval *) &outpack[8],
-                     (struct timezone *) NULL);
+        netsnmp_get_monotonic_clock((struct timeval *) &outpack[8]);
 
     cc = datalen + 8;           /* skips ICMP portion */
 
@@ -5577,14 +5576,14 @@ parse_reply(int *series, struct pingCtlTable_data *item,
             time_t timep, int uid, struct sockaddr_in6 *whereto,
             int *rtt_addend, int options, int interval, int datalen,
             int timing, int working_recverr, char *outpack, int *rtt,
-            int *ident, __u16 * acked, long *nreceived, long *nrepeats,
+            int *ident, uint16_t * acked, long *nreceived, long *nrepeats,
             long *ntransmitted, long *nchecksum, long *nerrors, long *tmin,
             long *tmax, long long *tsum, long long *tsum2,
             int *confirm_flag, int *confirm, int *pipesize,
             struct pingProbeHistoryTable_data *current_temp)
 {
     struct sockaddr_in6 *from = addr;
-    __u8           *buf = msg->msg_iov->iov_base;
+    uint8_t           *buf = msg->msg_iov->iov_base;
     struct cmsghdr *c;
     struct icmp6_hdr *icmph;
     int             hops = -1;
@@ -5612,7 +5611,7 @@ parse_reply(int *series, struct pingCtlTable_data *item,
     if (icmph->icmp6_type == ICMP6_ECHO_REPLY) {
         if (icmph->icmp6_id != *ident)
             return 1;
-        if (gather_statistics(series, item, (__u8 *) (icmph + 1), cc,
+        if (gather_statistics(series, item, (uint8_t *) (icmph + 1), cc,
                               icmph->icmp6_seq,
                               hops, 0, tv, timep, rtt_addend, uid, options,
                               pr_addr(&from->sin6_addr, options), interval,
@@ -5643,7 +5642,7 @@ parse_reply(int *series, struct pingCtlTable_data *item,
         nexthdr = iph1->ip6_nxt;
 
         if (nexthdr == 44) {
-            nexthdr = *(__u8 *) icmph1;
+            nexthdr = *(uint8_t *) icmph1;
             icmph1++;
         }
         if (nexthdr == IPPROTO_ICMPV6) {
@@ -5683,8 +5682,10 @@ parse_reply(int *series, struct pingCtlTable_data *item,
 }
 
 
-
+#ifdef linux
 #include <linux/filter.h>
+#endif
+
 void
 install_filter(int icmp_sock, int *ident)
 {
@@ -5733,7 +5734,7 @@ pr_addr(struct in6_addr *addr, int options)
     struct hostent *hp = NULL;
 
     if (!(options & F_NUMERIC))
-        hp = gethostbyaddr((__u8 *) addr, sizeof(struct in6_addr),
+        hp = gethostbyaddr((uint8_t *) addr, sizeof(struct in6_addr),
                            AF_INET6);
 
     return hp ? hp->h_name : pr_addr_n(addr);
