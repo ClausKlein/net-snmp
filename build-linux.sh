@@ -3,32 +3,66 @@ set -x  # be verbose
 set -u  # undefined is an error
 set -e  # exit on error!
 
-###FIXME### export MIBDIRS=$PWD/mibs
-SRCDIR=/media/c17e3c7a-8f76-39f8-aa8b-5ff7e121958d/Users/clausklein/Workspace/c/net-snmp
-###XXX### SRCDIR=.
+###XXX### SRCDIR=/media/c17e3c7a-8f76-39f8-aa8b-5ff7e121958d/Users/clausklein/Workspace/c/net-snmp
+SRCDIR=$(realpath ..)
+### SRCDIR=.
 
 DIRNAME=${PWD##*/}
 UNAME=$(uname)
 
 if [ -x ${SRCDIR}/configure ]; then
+  ###FIXME export CPPFLAGS="-Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -Wno-unused-but-set-variable -Wno-sign-compare -Wno-pointer-sign -Wno-cast-qual"
   export MIBDIRS=${SRCDIR}/mibs
   ${SRCDIR}/configure --help > configure--help-${DIRNAME}-${UNAME}.log
 
   ${SRCDIR}/configure --cache-file="config.cache" \
+    --prefix=/usr/local \
+    --with-cflags="-I/usr/local/include -g -Wall -Wextra" \
+    --with-ldflags="-L/usr/local/lib" \
     --with-defaults \
     --disable-snmpv1 \
     --without-rpm \
     --without-perl-modules \
     --without-python-modules \
-    --with-out-mib-modules="host ucd-snmp/diskio" \
-    --with-out-mib-modules="disman/event disman/schedule" \
-    --disable-deprecated \
-    --enable-ipv6 --with-transports="TCPIPv6 UDPIPv6 SSH TLSTCP DTLSUDP" \
-    --with-security-modules="usm tsm" \
-    --with-mib-modules="agentx notification notification-log-mib target tsm-mib ucd-snmp/proxy examples" \
+    --with-out-mib-modules="ucd-snmp/diskio" \
+    --with-out-mib-modules="host" \
+    --with-mib-modules="disman/nslookup-mib disman/ping-mib disman/traceroute-mib" \
+    --with-mib-modules="disman" \
+    --with-mib-modules="Rmon" \
+    --with-mib-modules="mibII" \
+    --with-out-mib-modules="ucd-snmp" \
+    --with-out-mib-modules="ucd-snmp/proxy" \
+    --with-out-mib-modules="ucd-snmp/versioninfo" \
+    --with-out-mib-modules="examples/netSnmpHostsTable" \
+    --enable-ipv6 \
+    --with-transports="TCPIPv6 UDPIPv6" \
+    --with-security-modules="usm" \
+    --with-mib-modules="mibII Rmon disman agent_mibs agentx notification notification-log-mib target" \
     --enable-developer \
-    --with-libs="-lpthread"
-###XXX###    --enable-minimalist             ###TBD### Remove all non-essential code features.
+    --enable-mib-config-checking \
+    --with-libs="-lpthread -lrt"
+###XXX###    --enable-mini-agent             ###TBD### Remove all non-essential code features.
+
+####FIXME   --enable-reentrant \
+
+###XXX### not yet! ck
+#   --with-transports="TCPIPv6 UDPIPv6 SSH TLSTCP DTLSUDP" \
+#   --with-security-modules="usm tsm" \
+
+#TBD#
+#   --enable-mib-config-debug \
+#   --with-out-mib-modules="host/hr_proc ucd-snmp/diskio" \
+#   --with-mib-modules="host/hr_network host/hr_device" \
+
+#   --with-mib-modules="ucd-snmp/lmSensors" \
+# checking for sensors support... checking for sensors/sensors.h... (cached) no
+# configure: error: asked to use lm_sensors but I couldn't find sensors/sensors.h
+
+###XXX Build a minimal agent.  --enable-mini-agent
+# claus-kleins-macbook-pro:build clausklein$ ./net-snmp-config --version --mibs
+# 5.4.4
+# :SNMP-TARGET-MIB:SNMPv2-MIB:IF-MIB:IP-MIB:TCP-MIB:UDP-MIB:SNMP-NOTIFICATION-MIB:SNMPv2-TM:SNMP-VIEW-BASED-ACM-MIB:SNMP-COMMUNITY-MIB:SNMP-FRAMEWORK-MIB:SNMP-MPD-MIB:SNMP-USER-BASED-SM-MIB
+
   # Compile in the given SNMP transport
   # Generate IPv6 ready version.
   #Note: --with-defaults         Use defaults for prompted values.
@@ -48,12 +82,12 @@ if [ -x ${SRCDIR}/configure ]; then
 
   cp -p configure-summary configure-summary-${DIRNAME}-${UNAME}.log
   cp -p config.log config-${DIRNAME}-${UNAME}.log
+  ./net-snmp-config --version --mibs > net-snmp-config-mibs-${DIRNAME}-${UNAME}.log
 
   make
-  ctags -R .
+  ### ctags -R .
   ## srcdir=. doxygen doxygen.conf
 
-  ./net-snmp-config --version --mibs >> net-snmp-config-mibs-${DIRNAME}-${UNAME}.log
 
   ### ./net-snmp-config --version --mibs
   ### 5.7
@@ -61,14 +95,17 @@ if [ -x ${SRCDIR}/configure ]; then
 
   #################
   make test
+  exit
   #################
 fi
 
 
 #NOTE: see
-##### configure--help-net-snmp-trunk-Linux.log
-##### config-net-snmp-trunk-Linux.log
-##### configure-summary-net-snmp-trunk-Linux.log
+##### configure--help-net-snmp-Linux.log
+##### config-net-snmp-Linux.log
+##### configure-summary-net-snmp-Linux.log
+##### configure-summary-net-snmp-Linux.log
+##### or build/configure-summary-build-Linux.log
 
 #NOTE: cat ./configure-summary
 
@@ -140,20 +177,24 @@ fi
 
 # createUser [-e ENGINEID] username (MD5|SHA) authpassphrase [DES|AES] [privpassphrase]
 #
-sudo ./agent/snmpd -Lf ./snmpd.log -C -Dread_config,mib,register_mib  \
+sudo killall snmpd || echo ignored
+sudo ./agent/snmpd -Lf ./snmpd.log -p ${PWD}/snmpd.pid -C -Dagentx,read_config,ucd-snmp,register_mib,snmp_,sess_,host,access:etherStatsTable  \
   '--view all included .1 80' \
   '--rwuser clausklein noAuthNoPriv -V all "*"' \
   '--createUser=clausklein SHA "---none---" AES "---none---"' \
-  -c ./snmpd.conf \
+  --persistentDir="${PWD}" \
+  -c ./snmpd.conf -C --defSecurityModel=usm \
   'tcp6:[::1]:161'
 
-sudo ./apps/snmpstatus -m ALL -r0 -v3 -u clausklein -l noAuthNoPriv -Dread,mib 'tcp6:[::1]:161' 
+sleep 3
+
+./apps/snmpstatus -m ALL -M ../mibs -r0 -v3 -u clausklein -l noAuthNoPriv --defSecurityModel=usm -Dssh 'tcp6:[::1]:161' || echo ignored
 # [TCP/IPv6: [::1]:161]=>[Linux claus-MacBookPro 2.6.35-30-generic-pae #54-Ubuntu SMP Tue Jun 7 20:28:33 UTC 2011 i686] Up: 0:00:00.57
 # Interfaces: 3, Recv/Trans packets: 0/22566 | IP: 22534/22534
 # 2 interfaces are down!
 # linux-on-macbook-pro:net-snmp clausklein$ 
 
-MIBTABLES=" atTable egpNeighTable icmpMsgStatsTable icmpStatsTable ifRcvAddressTable ifStackTable
+MIBTABLES="atTable egpNeighTable icmpMsgStatsTable icmpStatsTable ifRcvAddressTable ifStackTable
 ifTable ifTestTable ifXTable inetCidrRouteTable ipAddrTable ipAddressPrefixTable ipAddressTable
 ipCidrRouteTable ipDefaultRouterTable ipForwardTable ipIfStatsTable ipNetToMediaTable
 ipNetToPhysicalTable ipRouteTable ipSystemStatsTable ipv4InterfaceTable ipv6InterfaceTable
@@ -162,9 +203,11 @@ tcpListenerTable udpTable
 "
 
 for m in $MIBTABLES ; do \
-    echo "./apps/snmptable -Cibw 123 -m ALL -v3 -u clausklein -l noAuthNoPriv 'tcp6:[::1]:161' $m"; \
-    ./apps/snmptable -Cibw 123 -m ALL -v3 -u clausklein -l noAuthNoPriv 'tcp6:[::1]:161' $m; echo; \
+    echo "./apps/snmptable -Cibw 123 -m ALL -M ../mibs -v3 -u clausklein -l noAuthNoPriv --defSecurityModel=usm 'tcp6:[::1]:161' $m"; \
+    ./apps/snmptable -Cibw 123 -m ALL -M ../mibs -v3 -u clausklein -l noAuthNoPriv --defSecurityModel=usm 'tcp6:[::1]:161' $m; echo; \
 done > MIBII-Tables-${DIRNAME}-${UNAME}.log
 
-# see MIBII-Tables-net-snmp-trunk-Linux.log
+# see MIBII-Tables-net-snmp-Linux.log
+#  or build/MIBII-Tables-build-Linux.log
+
 

@@ -17,9 +17,9 @@ set -e
 
 set -x
 ./configure --cache-file=config.cache \
-  --with-mib-modules="agentx agent_mibs snmpv3mibs notification notification-log-mib target ucd_snmp" \
+  --with-mib-modules="snmpv3mibs notification notification-log-mib target agent_mibs agentx" \
   --with-out-mib-modules="host host/hr_network host/hr_swrun ucd-snmp/diskio" \
-  --with-out-mib-modules="disman/event disman/schedule " \
+  --with-out-mib-modules="disman/event disman/schedule ucd_snmp" \
   --with-defaults \
   --without-rpm \
   --with-libs="-lws2_32" \
