@@ -155,6 +155,10 @@ write_historyControl(int action, u_char * var_val, u_char var_val_type,
         long_temp = name[historyControlEntryFirstIndexBegin];
         leaf_id = (int) name[historyControlEntryFirstIndexBegin - 1];
         hdr = ROWAPI_find(table_ptr, long_temp);        /* it MUST be OK */
+        if (!hdr) {
+            ag_trace("cannot find it leaf_id=%d\n", leaf_id);
+            return SNMP_ERR_NOSUCHNAME;
+        }
         cloned_body = (CRTL_ENTRY_T *) hdr->tmp;
         body = (CRTL_ENTRY_T *) hdr->body;
         switch (leaf_id) {
