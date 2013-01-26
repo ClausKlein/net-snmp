@@ -1,3 +1,9 @@
+*~
+.*~
+.*.swp
+*.log
+*.patch
+*.diff
 *.bak
 *.bs
 *.ft
