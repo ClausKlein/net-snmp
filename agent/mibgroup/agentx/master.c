@@ -243,8 +243,8 @@ agentx_got_response(int operation,
     switch (operation) {
     case NETSNMP_CALLBACK_OP_TIMED_OUT:{
             void           *s = snmp_sess_pointer(session);
-            DEBUGMSGTL(("agentx/master", "timeout on session %08p\n",
-                        session));
+            DEBUGMSGTL(("agentx/master", "timeout on session %8p req=0x%x\n",
+                        session, (unsigned)reqid));
 
             netsnmp_handler_mark_requests_as_delegated(requests,
                                        REQUEST_IS_NOT_DELEGATED);

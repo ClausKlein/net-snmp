@@ -449,6 +449,7 @@ agentx_realloc_build_varbind(u_char ** buf, size_t * buf_len,
                                   vp->name, vp->name_length,
                                   network_order)) {
         DEBUGINDENTLESS();
+        DEBUGINDENTLESS();
         return 0;
     }
     DEBUGINDENTLESS();
@@ -739,6 +740,7 @@ _agentx_realloc_build(u_char ** buf, size_t * buf_len, size_t * out_len,
                 DEBUGINDENTLESS();
                 return 0;
             }
+            DEBUGINDENTLESS();
         }
         *(*buf + *out_len) = (u_char) pdu->time;
         (*out_len)++;
@@ -1127,6 +1129,7 @@ agentx_parse_oid(u_char * data, size_t * length, int *inc,
 
     if (*length < 4) {
         DEBUGMSGTL(("agentx", "Incomplete Object ID\n"));
+        DEBUGINDENTLESS();
         return NULL;
     }
 
@@ -1172,7 +1175,8 @@ agentx_parse_oid(u_char * data, size_t * length, int *inc,
      */
     tmp_oid_len = (prefix ? n_subid + 5 : n_subid);
     if (*oid_len < tmp_oid_len) {
-        DEBUGMSGTL(("agentx", "Oversized Object ID\n"));
+        DEBUGMSGTL(("agentx", "Oversized Object ID (buf=%d pdu=%d)\n", *oid_len,
+                 tmp_oid_len));
         DEBUGINDENTLESS();
         return NULL;
     }
