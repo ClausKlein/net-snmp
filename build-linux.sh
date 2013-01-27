@@ -3,8 +3,8 @@ set -x  # be verbose
 set -u  # undefined is an error
 set -e  # exit on error!
 
+SRCDIR=../
 ###XXX### SRCDIR=/media/c17e3c7a-8f76-39f8-aa8b-5ff7e121958d/Users/clausklein/Workspace/c/net-snmp
-SRCDIR=$(realpath ..)
 ### SRCDIR=.
 
 DIRNAME=${PWD##*/}

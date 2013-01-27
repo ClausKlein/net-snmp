@@ -3,8 +3,7 @@ set -x  # be verbose
 set -u  # undefined is an error
 set -e  # exit on error!
 
-###XXX### SRCDIR=../net-snmp
-SRCDIR=$(realpath ..)
+SRCDIR=../
 ### SRCDIR=.
 
 DIRNAME=${PWD##*/}
@@ -24,13 +23,13 @@ if [ -x ${SRCDIR}/configure ]; then
     --without-rpm \
     --without-perl-modules \
     --without-python-modules \
-    --with-out-mib-modules="ucd-snmp/diskio" \
-    --with-out-mib-modules="host" \
     --without-kmem-usage \
     --with-out-mib-modules="mibII/icmp host/hr_swrun" \
     --with-out-mib-modules="disman/event disman/schedule" \
-    --with-mib-modules="disman" \
-    --with-mib-modules="Rmon" \
+    --with-out-mib-modules="host" \
+    --with-out-mib-modules="disman/nslookup-mib disman/ping-mib disman/traceroute-mib" \
+    --with-out-mib-modules="disman" \
+    --with-out-mib-modules="Rmon" \
     --with-out-mib-modules="mibII" \
     --with-out-mib-modules="ucd-snmp" \
     --with-out-mib-modules="ucd-snmp/proxy" \
@@ -39,16 +38,12 @@ if [ -x ${SRCDIR}/configure ]; then
     --enable-ipv6 \
     --with-transports="TCPIPv6 UDPIPv6" \
     --with-security-modules="usm" \
-    --with-mib-modules="Rmon disman agent_mibs agentx notification notification-log-mib target" \
+    --with-mib-modules="agent_mibs agentx notification notification-log-mib target" \
     --enable-developer \
     --enable-mib-config-checking \
     --enable-mini-agent             ### Build a minimal agent.
 
 ####FIXME   --enable-reentrant \
-
-###XXX### not yet! ck
-#   --with-transports="TCPIPv6 UDPIPv6 SSH TLSTCP DTLSUDP" \
-#   --with-security-modules="usm tsm" \
 
 #TBD#
 #   --enable-mib-config-debug \
@@ -64,6 +59,10 @@ if [ -x ${SRCDIR}/configure ]; then
 # 5.4.4
 # :SNMP-TARGET-MIB:SNMPv2-MIB:IF-MIB:IP-MIB:TCP-MIB:UDP-MIB:SNMP-NOTIFICATION-MIB:SNMPv2-TM:SNMP-VIEW-BASED-ACM-MIB:SNMP-COMMUNITY-MIB:SNMP-FRAMEWORK-MIB:SNMP-MPD-MIB:SNMP-USER-BASED-SM-MIB
 
+### --with-security-modules="usm tsm" \
+### --with-transports="TCPIPv6 UDPIPv6 SSH TLSTCP DTLSUDP" \
+###FIXME  --with-libs="-lpthread"
+###XXX###    --enable-mini-agent             ###TBD### Remove all non-essential code features.
   # Compile in the given SNMP transport
   # Generate IPv6 ready version.
   #Note: --with-defaults         Use defaults for prompted values.
@@ -95,7 +94,8 @@ if [ -x ${SRCDIR}/configure ]; then
   ### :SNMP-TARGET-MIB:SNMPv2-MIB:IF-MIB:IP-MIB:TCP-MIB:UDP-MIB:HOST-RESOURCES-MIB:NOTIFICATION-LOG-MIB:DISMAN-EVENT-MIB:DISMAN-SCHEDULE-MIB:SNMP-NOTIFICATION-MIB:SNMPv2-TM:UCD-SNMP-MIB:UCD-DEMO-MIB:NET-SNMP-AGENT-MIB:SNMP-MPD-MIB:SNMP-USER-BASED-SM-MIB:SNMP-FRAMEWORK-MIB:SNMP-VIEW-BASED-ACM-MIB:SNMP-COMMUNITY-MIB:NET-SNMP-PASS-MIB:NET-SNMP-EXTEND-MIB:UCD-DLMOD-MIB:NET-SNMP-VACM-MIB
 
   #################
-  ###XXX make test
+  make test
+  exit
   #################
 fi
 
@@ -111,43 +111,45 @@ fi
 
 # SNMP Versions Supported:    2c 3
 # Building for:               darwin9
-# Net-SNMP Version:           5.8.dev
-# Network transport support:  Callback Unix Alias TCP UDP TCPIPv6 UDPIPv6
-#   IPv4Base SocketBase TCPBase UDPIPv4Base UDPBase IPv6Base
-# SNMPv3 Security Modules:     usm
-# Agent Module list: mk/module_list_code.mk
+# Net-SNMP Version:           5.7
+# Network transport support:  Callback Unix Alias TCP UDP TCPIPv6 UDPIPv6 SSH
+#   TLSTCP DTLSUDP IPv4Base SocketBase TCPBase UDPIPv4Base UDPBase IPv6Base
 #
-# Agent MIB code:             Rmon disman agent_mibs agentx notification notification-log-mib target default_modules =>
-#    Rmon/rows Rmon/agutil Rmon/statistics Rmon/alarmTable Rmon/history
-#    Rmon/event disman/event-mib disman/expression-mib disman/schedule
-#    agent/nsTransactionTable agent/nsModuleTable agent/nsDebug agent/nsCache
-#    agent/nsLogging agent/nsVacmAccessTable agentx/master agentx/subagent
-#    notification/snmpNotifyTable snmp-notification-mib/snmpNotifyFilterTable
-#    notification/snmpNotifyFilterProfileTable
-#    notification-log-mib/notification_log notification/snmpNotifyTable
-#    target/target_counters_5_5 target/snmpTargetAddrEntry
-#    target/snmpTargetParamsEntry target/target snmpv3mibs mibII/snmp_mib
-#    mibII/system_mib mibII/sysORTable mibII/vacm_vars mibII/vacm_conf
+# TLSBase
+# SNMPv3 Security Modules:     usm tsm
+# Agent MIB code:             agentx notification notification-log-mib target
+#   tsm-mib ucd-snmp/proxy examples default_modules =>  agentx/master
+#   agentx/subagent notification/snmpNotifyTable
+#   snmp-notification-mib/snmpNotifyFilterTable
+#   notification/snmpNotifyFilterProfileTable
+#   notification-log-mib/notification_log notification/snmpNotifyTable
+#   target/target_counters_5_5 target/snmpTargetAddrEntry
+#   target/snmpTargetParamsEntry target/target tsm-mib/snmpTsmStats
+#   tsm-mib/snmpTsmConfigurationUsePrefix examples/scalar_int examples/watched
+#   examples/data_set examples/delayed_instance snmpv3mibs mibII ucd_snmp
+#   notification notification-log-mib target agent_mibs agentx utilities
 #
-#  MYSQL Trap Logging:         unavailable
-#  Embedded Perl support:      disabled
-#  SNMP Perl modules:          disabled
-#  SNMP Python modules:        disabled
-#  Crypto support from:        crypto
-#  Authentication support:     MD5 SHA1
-#  Encryption support:         DES AES
-#  Local DNSSEC validation:    disabled
+# MYSQL Trap Logging:         unavailable
+# Embedded Perl support:      disabled
+# SNMP Perl modules:          disabled
+# SNMP Python modules:        disabled
+# Crypto support from:        crypto
+# Authentication support:     MD5 SHA1
+# Encryption support:         DES AES
+# Local DNSSEC validation:    disabled
+
 
 # createUser [-e ENGINEID] username (MD5|SHA) authpassphrase [DES|AES] [privpassphrase]
 #
 sudo killall snmpd || echo ignored
-sudo ./agent/snmpd -Lf ./snmpd.log -p ${PWD}/snmpd.pid -C -Dagentx,read_config,ucd-snmp,register_mib,snmp_,sess_,host,access:etherStatsTable  \
+sudo ./agent/snmpd -Lf ./snmpd.log -p ${PWD}/snmpd.pid -C -Dread_config,ucd-snmp,register_mib,snmp_clean_persistent,snmp_store,host,access:etherStatsTable  \
   '--view all included .1 80' \
   '--rwuser clausklein noAuthNoPriv -V all "*"' \
   '--createUser=clausklein SHA "---none---" AES "---none---"' \
   --persistentDir="${PWD}" \
   -c ./snmpd.conf -C --defSecurityModel=usm \
   'tcp6:[::1]:161'
+
 
 sleep 3
 

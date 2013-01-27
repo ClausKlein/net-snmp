@@ -1,7 +1,6 @@
 build/
 tags
 *.patch
-*.conf
 *.diff
 *.log
 *.save
