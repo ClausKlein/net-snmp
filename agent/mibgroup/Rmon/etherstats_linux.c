@@ -469,8 +469,6 @@ etherStatsTable_entry_load(ETH_STATS_T * data, long ifIndex) {
         return MFD_ERROR;
     }
 
-    DEBUGMSGT(("verbose:etherStatsTable:etherStatsTable_entry_load",
-               "inserted %" NETSNMP_PRIz "d records\n", count));
 
     return MFD_SUCCESS;
 }
