@@ -510,7 +510,6 @@ handle_master_agentx_packet(int operation,
                     "transport connect on session %8p\n", session));
         return 1;
     } else if (operation != NETSNMP_CALLBACK_OP_RECEIVED_MESSAGE) {
-        //FIXME NETSNMP_CALLBACK_OP_CONNECT was seen! ck
         DEBUGMSGTL(("agentx/master", "unexpected callback op %d\n",
                     operation));
         return 1;
