@@ -37,7 +37,6 @@ if [ -x ${SRCDIR}/configure ]; then
     --with-out-mib-modules="examples/netSnmpHostsTable" \
     --enable-ipv6 \
     --with-transports="TCPIPv6 UDPIPv6" \
-    --with-security-modules="usm" \
     --with-mib-modules="agent_mibs agentx notification notification-log-mib target" \
     --enable-developer \
     --enable-mib-config-checking \
