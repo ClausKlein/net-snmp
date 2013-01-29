@@ -3,9 +3,9 @@ set -x  # be verbose
 set -u  # undefined is an error
 set -e  # exit on error!
 
-SRCDIR=../
+SRCDIR=${PWD}/..
+### SRCDIR=${PWD}
 ###XXX### SRCDIR=/media/c17e3c7a-8f76-39f8-aa8b-5ff7e121958d/Users/clausklein/Workspace/c/net-snmp
-### SRCDIR=.
 
 DIRNAME=${PWD##*/}
 UNAME=$(uname)
@@ -20,7 +20,7 @@ if [ -x ${SRCDIR}/configure ]; then
     --with-cflags="-I/usr/local/include -g -Wall -Wextra" \
     --with-ldflags="-L/usr/local/lib" \
     --with-defaults \
-    --disable-snmpv1 \
+    --enable-snmpv1 \
     --without-rpm \
     --without-perl-modules \
     --without-python-modules \
@@ -93,7 +93,7 @@ if [ -x ${SRCDIR}/configure ]; then
   ### :SNMP-TARGET-MIB:SNMPv2-MIB:IF-MIB:IP-MIB:TCP-MIB:UDP-MIB:HOST-RESOURCES-MIB:NOTIFICATION-LOG-MIB:DISMAN-EVENT-MIB:DISMAN-SCHEDULE-MIB:SNMP-NOTIFICATION-MIB:SNMPv2-TM:UCD-SNMP-MIB:UCD-DEMO-MIB:NET-SNMP-AGENT-MIB:HOST-RESOURCES-TYPES:SNMP-MPD-MIB:SNMP-USER-BASED-SM-MIB:SNMP-FRAMEWORK-MIB:SNMP-VIEW-BASED-ACM-MIB:SNMP-COMMUNITY-MIB:IPV6-ICMP-MIB:IPV6-MIB:IPV6-TCP-MIB:IPV6-UDP-MIB:IP-FORWARD-MIB:NET-SNMP-PASS-MIB:NET-SNMP-EXTEND-MIB:UCD-DLMOD-MIB:NET-SNMP-VACM-MIB
 
   #################
-  make test
+  make test SNMP_VERBOSE=1
   exit
   #################
 fi
