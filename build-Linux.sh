@@ -26,21 +26,21 @@ if [ -x ${SRCDIR}/configure ]; then
     --without-python-modules \
     --with-out-mib-modules="ucd-snmp/diskio" \
     --with-out-mib-modules="host" \
-    --with-mib-modules="disman/nslookup-mib disman/ping-mib disman/traceroute-mib" \
-    --with-mib-modules="disman" \
-    --with-mib-modules="Rmon" \
-    --with-mib-modules="mibII" \
+    --with-out-mib-modules="disman/nslookup-mib disman/ping-mib disman/traceroute-mib" \
+    --with-out-mib-modules="disman" \
+    --with-out-mib-modules="Rmon" \
+    --with-out-mib-modules="mibII" \
     --with-out-mib-modules="ucd-snmp" \
     --with-out-mib-modules="ucd-snmp/proxy" \
     --with-out-mib-modules="ucd-snmp/versioninfo" \
     --with-out-mib-modules="examples/netSnmpHostsTable" \
     --enable-ipv6 \
     --with-transports="TCPIPv6 UDPIPv6" \
-    --with-mib-modules="mibII Rmon disman agent_mibs agentx notification notification-log-mib target" \
+    --with-mib-modules="agent_mibs agentx notification notification-log-mib target" \
     --enable-developer \
     --enable-mib-config-checking \
-    --with-libs="-lpthread -lrt"
-###XXX###    --enable-mini-agent             ###TBD### Remove all non-essential code features.
+    --with-libs="-lpthread -lrt" \
+    --enable-mini-agent             ###TBD### Remove all non-essential code features.
 
 ####FIXME   --enable-reentrant \
 
