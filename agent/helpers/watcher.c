@@ -319,6 +319,8 @@ netsnmp_watcher_helper_handler(netsnmp_mib_handler *handler,
         break;
 
     case MODE_SET_COMMIT:
+        DEBUGMSG(("helper:watcher", "call snmp_store_needed()\n"));
+        snmp_store_needed(NULL);        //TBD may be not needed, but snmp_mib and system_mib needs this! ck
         break;
 #endif /* NETSNMP_NO_WRITE_SUPPORT */
 

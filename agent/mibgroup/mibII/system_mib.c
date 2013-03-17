@@ -355,9 +355,9 @@ init_system_mib(void)
         const oid sysContact_oid[] = { 1, 3, 6, 1, 2, 1, 1, 4 };
         static netsnmp_watcher_info sysContact_winfo;
 #ifndef NETSNMP_NO_WRITE_SUPPORT
-        netsnmp_register_watched_scalar(
+        netsnmp_register_watched_scalar(        // FIXME how to trigger snmp_store_needed() after commit
             netsnmp_create_update_handler_registration(
-                "mibII/sysContact", sysContact_oid, OID_LENGTH(sysContact_oid), 
+                "mibII/sysContact", sysContact_oid, OID_LENGTH(sysContact_oid),
                 HANDLER_CAN_RWRITE, &sysContactSet),
             netsnmp_init_watcher_info(
                 &sysContact_winfo, sysContact, SYS_STRING_LEN - 1,
@@ -376,7 +376,7 @@ init_system_mib(void)
         const oid sysName_oid[] = { 1, 3, 6, 1, 2, 1, 1, 5 };
         static netsnmp_watcher_info sysName_winfo;
 #ifndef NETSNMP_NO_WRITE_SUPPORT
-        netsnmp_register_watched_scalar(
+        netsnmp_register_watched_scalar(        // FIXME how to trigger snmp_store_needed() after commit
             netsnmp_create_update_handler_registration(
                 "mibII/sysName", sysName_oid, OID_LENGTH(sysName_oid),
                 HANDLER_CAN_RWRITE, &sysNameSet),
@@ -397,7 +397,7 @@ init_system_mib(void)
         const oid sysLocation_oid[] = { 1, 3, 6, 1, 2, 1, 1, 6 };
         static netsnmp_watcher_info sysLocation_winfo;
 #ifndef NETSNMP_NO_WRITE_SUPPORT
-        netsnmp_register_watched_scalar(
+        netsnmp_register_watched_scalar(        // FIXME how to trigger snmp_store_needed() after commit
             netsnmp_create_update_handler_registration(
                 "mibII/sysLocation", sysLocation_oid,
                 OID_LENGTH(sysLocation_oid),
