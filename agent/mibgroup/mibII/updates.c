@@ -9,12 +9,17 @@ handle_updates(netsnmp_mib_handler *handler,
                netsnmp_request_info *requests)
 {
     int *set = (int*)handler->myvoid;
+    DEBUGMSG(("helper:handle_updates", "\n"));
 
 #ifndef NETSNMP_NO_WRITE_SUPPORT
-    if (reqinfo->mode == MODE_SET_RESERVE1 && *set < 0)
+    if (reqinfo->mode == MODE_SET_RESERVE1 && *set < 0) {
         netsnmp_request_set_error(requests, SNMP_ERR_NOTWRITABLE);
-    else if (reqinfo->mode == MODE_SET_COMMIT)
+        return SNMP_ERR_NOTWRITABLE;
+    }
+    else if (reqinfo->mode == MODE_SET_COMMIT) {
+        DEBUGMSG(("helper:handle_updates", "set value\n"));
         *set = 1;
+    }
 #endif /* NETSNMP_NO_WRITE_SUPPORT */
     return SNMP_ERR_NOERROR;
 }

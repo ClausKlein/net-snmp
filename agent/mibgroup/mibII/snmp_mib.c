@@ -11,7 +11,9 @@
 netsnmp_feature_require(check_vb_truthvalue)
 #endif /* NETSNMP_NO_WRITE_SUPPORT */
 
-static const oid snmp_oid[] = { 1, 3, 6, 1, 2, 1, 11 };
+#define SNMP_OID 1, 3, 6, 1, 2, 1, 11
+
+static const oid snmp_oid[] = { SNMP_OID };
 
 extern long snmp_enableauthentraps;
 extern int snmp_enableauthentrapsset;
@@ -40,8 +42,9 @@ handle_truthvalue(netsnmp_mib_handler *handler,
         int res = netsnmp_check_vb_truthvalue(requests->requestvb);
         if (res != SNMP_ERR_NOERROR)
             netsnmp_request_set_error(requests, res);
+            return res;
     }
-#endif /* NETSNMP_NO_WRITE_SUPPORT */
+#endif /* !NETSNMP_NO_WRITE_SUPPORT */
     return SNMP_ERR_NOERROR;
 }
 
@@ -64,8 +67,8 @@ handle_snmp(netsnmp_mib_handler *handler,
 	    switch(idx) {
 	    case 7:
 	    case 23:
-            case 30:
-		netsnmp_set_request_error(reqinfo, requests,
+	    case 30:
+		    netsnmp_set_request_error(reqinfo, requests,
 					  SNMP_NOSUCHOBJECT);
 		break;
 	    default:
@@ -102,12 +105,13 @@ init_snmp_mib(void)
     DEBUGMSGTL(("snmp", "Initializing\n"));
 
     netsnmp_register_scalar_group(
-      netsnmp_create_handler_registration(
-	"mibII/snmp", handle_snmp, snmp_oid, OID_LENGTH(snmp_oid),
-	HANDLER_CAN_RONLY), 1, 32);
+        netsnmp_create_handler_registration(
+            "mibII/snmp", handle_snmp, snmp_oid, OID_LENGTH(snmp_oid),
+            HANDLER_CAN_RONLY),
+        1, 32);
     {
-        const oid snmpEnableAuthenTraps_oid[] = { 1, 3, 6, 1, 2, 1, 11, 30, 0 };
-	static netsnmp_watcher_info enableauthen_info;
+        const oid snmpEnableAuthenTraps_oid[] = { SNMP_OID, 30, 0 };
+        static netsnmp_watcher_info enableauthen_info;
         netsnmp_handler_registration *reg =
             netsnmp_create_update_handler_registration(
                 "mibII/snmpEnableAuthenTraps",
@@ -118,7 +122,7 @@ init_snmp_mib(void)
         netsnmp_register_watched_instance(
             reg,
             netsnmp_init_watcher_info(
-		&enableauthen_info,
+                &enableauthen_info,
                 &snmp_enableauthentraps, sizeof(snmp_enableauthentraps),
                 ASN_INTEGER, WATCHER_FIXED_SIZE));
     }
