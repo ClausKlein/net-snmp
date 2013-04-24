@@ -593,6 +593,9 @@
 /* Define to 1 if you have the <pci/pci.h> header file. */
 #undef HAVE_PCI_PCI_H
 
+/* Define to 1 if you have <pcre.h>. */
+#undef HAVE_PCRE_H
+
 /* on aix, if you have perfstat */
 #undef HAVE_PERFSTAT
 
@@ -1386,6 +1389,9 @@
 /* If you don't have root access don't exit upon kmem errors */
 #undef NETSNMP_NO_ROOT_ACCESS
 
+/* If you don't want to integrate with systemd. */
+#undef NETSNMP_NO_SYSTEMD
+
 /* Define if you want to remove all SET/write access from the code */
 #undef NETSNMP_NO_WRITE_SUPPORT
 
@@ -1620,9 +1626,6 @@
 
 /* Define to `int' if <sys/types.h> does not define. */
 #undef pid_t
-
-/* Define to `unsigned int' if <sys/types.h> does not define. */
-#undef size_t
 
 /* Define to the type of an unsigned integer type of width exactly 16 bits if
    such a type exists and the standard includes do not define it. */

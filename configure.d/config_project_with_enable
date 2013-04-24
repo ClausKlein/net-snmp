@@ -158,6 +158,11 @@ NETSNMP_ARG_WITH(rpm,
                                   module.])
 
 
+NETSNMP_ARG_WITH(pcre,
+[  --without-pcre                  Don't include pcre process searching
+                                  support in the agent.],
+      with_pcre="$withval", with_pcre="maybe")
+
 ##
 #   Project: Build configuration settings
 ##
@@ -688,6 +693,15 @@ if test "x$with_dummy_values" != "xyes"; then
   AC_DEFINE(NETSNMP_NO_DUMMY_VALUES, 1,
     [If you don't want the agent to report on variables it doesn't have
      data for])
+fi
+
+NETSNMP_ARG_WITH(systemd,
+[  --with-systemd                 Provide systemd support. See README.systemd
+                                  for details.])
+# Define unless specifically suppressed (i.e., option defaults to false).
+if test "x$with_systemd" != "xyes"; then
+  AC_DEFINE(NETSNMP_NO_SYSTEMD, 1,
+    [If you don't want to integrate with systemd.])
 fi
 
 NETSNMP_ARG_ENABLE(set-support,

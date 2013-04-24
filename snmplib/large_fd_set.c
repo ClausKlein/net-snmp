@@ -138,11 +138,9 @@ netsnmp_large_fd_set_select(int numfds, netsnmp_large_fd_set *readfds,
     /* Array representation: no resizing is necessary. */
 #endif
 
-    return select(numfds,
-            readfds ? readfds->lfs_setptr : NULL,
-            writefds ? writefds->lfs_setptr : NULL,
-            exceptfds ? exceptfds->lfs_setptr : NULL,
-            timeout);
+    return select(numfds, (readfds) ? readfds->lfs_setptr : NULL,
+                  (writefds) ? writefds->lfs_setptr : NULL,
+                  (exceptfds) ? exceptfds->lfs_setptr : NULL, timeout);
 }
 
 int

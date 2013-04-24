@@ -176,17 +176,6 @@ static int      _snmp_store_needed = 0;
 #define BSD4_2
 #endif
 
-#ifndef FD_SET
-
-typedef long    fd_mask;
-#define NFDBITS	(sizeof(fd_mask) * NBBY)        /* bits per mask */
-
-#define	FD_SET(n, p)	((p)->fds_bits[(n)/NFDBITS] |= (1 << ((n) % NFDBITS)))
-#define	FD_CLR(n, p)	((p)->fds_bits[(n)/NFDBITS] &= ~(1 << ((n) % NFDBITS)))
-#define	FD_ISSET(n, p)	((p)->fds_bits[(n)/NFDBITS] & (1 << ((n) % NFDBITS)))
-#define FD_ZERO(p)	memset((p), 0, sizeof(*(p)))
-#endif
-
 static oid      default_enterprise[] = { 1, 3, 6, 1, 4, 1, 3, 1, 1 };
 /*
  * enterprises.cmu.systems.cmuSNMP 
@@ -769,6 +758,8 @@ register_default_handlers(void)
 	              NETSNMP_DS_LIBRARY_ID, NETSNMP_DS_LIB_16BIT_IDS);
     netsnmp_ds_register_premib(ASN_OCTET_STR, "snmp", "clientaddr",
                       NETSNMP_DS_LIBRARY_ID, NETSNMP_DS_LIB_CLIENT_ADDR);
+    netsnmp_ds_register_premib(ASN_BOOLEAN, "snmp", "clientaddrUsesPort",
+                      NETSNMP_DS_LIBRARY_ID, NETSNMP_DS_LIB_CLIENT_ADDR_USES_PORT);
     netsnmp_ds_register_config(ASN_INTEGER, "snmp", "serverSendBuf",
 		      NETSNMP_DS_LIBRARY_ID, NETSNMP_DS_LIB_SERVERSENDBUF);
     netsnmp_ds_register_config(ASN_INTEGER, "snmp", "serverRecvBuf",
@@ -789,6 +780,9 @@ register_default_handlers(void)
 		               NETSNMP_DS_LIBRARY_ID, NETSNMP_DS_LIB_TIMEOUT);
     netsnmp_ds_register_config(ASN_INTEGER, "snmp", "retries",
 		               NETSNMP_DS_LIBRARY_ID, NETSNMP_DS_LIB_RETRIES);
+    netsnmp_ds_register_config(ASN_OCTET_STR, "snmp", "outputPrecision",
+                               NETSNMP_DS_LIBRARY_ID, NETSNMP_DS_LIB_OUTPUT_PRECISION);
+
 
     netsnmp_register_service_handlers();
 }
@@ -3835,6 +3829,26 @@ snmpv3_parse(netsnmp_pdu *pdu,
     return SNMPERR_SUCCESS;
 }                               /* end snmpv3_parse() */
 
+static void
+free_securityStateRef(netsnmp_pdu* pdu)
+{
+    struct snmp_secmod_def *sptr = find_sec_mod(pdu->securityModel);
+    if (sptr) {
+        if (sptr->pdu_free_state_ref) {
+            (*sptr->pdu_free_state_ref) (pdu->securityStateRef);
+        } else {
+            snmp_log(LOG_ERR,
+                     "Security Model %d can't free state references\n",
+                     pdu->securityModel);
+	}
+    } else {
+	snmp_log(LOG_ERR,
+		 "Can't find security model to free ptr: %d\n",
+		 pdu->securityModel);
+    }
+    pdu->securityStateRef = NULL;
+}
+
 #define ERROR_STAT_LENGTH 11
 
 int
@@ -3856,7 +3870,6 @@ snmpv3_make_report(netsnmp_pdu *pdu, int error)
     oid            *err_var;
     int             err_var_len;
     int             stat_ind;
-    struct snmp_secmod_def *sptr;
 
     switch (error) {
     case SNMPERR_USM_UNKNOWNENGINEID:
@@ -3917,21 +3930,7 @@ snmpv3_make_report(netsnmp_pdu *pdu, int error)
      * which cached values to use 
      */
     if (pdu->securityStateRef) {
-        sptr = find_sec_mod(pdu->securityModel);
-        if (sptr) {
-            if (sptr->pdu_free_state_ref) {
-                (*sptr->pdu_free_state_ref) (pdu->securityStateRef);
-            } else {
-                snmp_log(LOG_ERR,
-                         "Security Model %d can't free state references\n",
-                         pdu->securityModel);
-            }
-        } else {
-            snmp_log(LOG_ERR,
-                     "Can't find security model to free ptr: %d\n",
-                     pdu->securityModel);
-        }
-        pdu->securityStateRef = NULL;
+        free_securityStateRef(pdu);
     }
 
     if (error == SNMPERR_USM_NOTINTIMEWINDOW) {
@@ -5163,7 +5162,6 @@ _sess_process_packet(void *sessp, netsnmp_session * sp,
   struct session_list *slp = (struct session_list *) sessp;
   netsnmp_pdu    *pdu;
   netsnmp_request_list *rp, *orp = NULL;
-  struct snmp_secmod_def *sptr;
   int             ret = 0, handled = 0;
 
   DEBUGMSGTL(("sess_process_packet",
@@ -5233,21 +5231,7 @@ _sess_process_packet(void *sessp, netsnmp_session * sp,
      * Call the security model to free any securityStateRef supplied w/ msg.  
      */
     if (pdu->securityStateRef != NULL) {
-      sptr = find_sec_mod(pdu->securityModel);
-      if (sptr != NULL) {
-	if (sptr->pdu_free_state_ref != NULL) {
-	  (*sptr->pdu_free_state_ref) (pdu->securityStateRef);
-	} else {
-	  snmp_log(LOG_ERR,
-		   "Security Model %d can't free state references\n",
-		   pdu->securityModel);
-	}
-      } else {
-	snmp_log(LOG_ERR,
-		 "Can't find security model to free ptr: %d\n",
-		 pdu->securityModel);
-      }
-      pdu->securityStateRef = NULL;
+      free_securityStateRef(pdu);
     }
     snmp_free_pdu(pdu);
     return -1;
@@ -5258,21 +5242,7 @@ _sess_process_packet(void *sessp, netsnmp_session * sp,
      * Call USM to free any securityStateRef supplied with the message.  
      */
     if (pdu->securityStateRef) {
-      sptr = find_sec_mod(pdu->securityModel);
-      if (sptr) {
-	if (sptr->pdu_free_state_ref) {
-	  (*sptr->pdu_free_state_ref) (pdu->securityStateRef);
-	} else {
-	  snmp_log(LOG_ERR,
-		   "Security Model %d can't free state references\n",
-		   pdu->securityModel);
-	}
-      } else {
-	snmp_log(LOG_ERR,
-		 "Can't find security model to free ptr: %d\n",
-		 pdu->securityModel);
-      }
-      pdu->securityStateRef = NULL;
+      free_securityStateRef(pdu);
     }
 
     for (rp = isp->requests; rp; orp = rp, rp = rp->next_request) {
@@ -5421,21 +5391,7 @@ _sess_process_packet(void *sessp, netsnmp_session * sp,
    */
   if (pdu != NULL && pdu->securityStateRef &&
       pdu->command == SNMP_MSG_TRAP2) {
-    sptr = find_sec_mod(pdu->securityModel);
-    if (sptr) {
-      if (sptr->pdu_free_state_ref) {
-	(*sptr->pdu_free_state_ref) (pdu->securityStateRef);
-      } else {
-	snmp_log(LOG_ERR,
-		 "Security Model %d can't free state references\n",
-		 pdu->securityModel);
-      }
-    } else {
-      snmp_log(LOG_ERR,
-	       "Can't find security model to free ptr: %d\n",
-	       pdu->securityModel);
-    }
-    pdu->securityStateRef = NULL;
+    free_securityStateRef(pdu);
   }
 
   if (!handled) {

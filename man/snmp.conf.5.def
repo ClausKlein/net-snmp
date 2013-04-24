@@ -127,6 +127,10 @@ This value is also used by \fBsnmpd\fR when generating notifications.
 .\"  But not responses to an incoming request?
 .\"  What about snmptrapd?
 .\"
+.IP "clientaddrUsesPort no"
+specifies, if clientaddr option contains a port number. Set this option
+to "yes", if clientaddr contains a port number and this port should
+be used for sending outgoing SNMP requests.
 .IP "clientRecvBuf INTEGER"
 specifies the desired size of the buffer to be used when receiving
 responses to SNMP requests.
@@ -393,6 +397,12 @@ Equivalent to
 Disables the use of DISPLAY-HINT information when parsing indices and
 values to set. Equivalent to
 .BR \-Ih .
+.IP "outputPrecision PRECISION"
+Uses the PRECISION string to allow modification of the value output
+format. See snmpcmd(1) for details.
+Equivalent to
+.BR \-Op
+(which takes precedence over the config file).
 .SH FILES
 .IP "System-wide configuration files:"
 SYSCONFDIR/snmp/snmp.conf

@@ -40,6 +40,10 @@
 
 #include <net-snmp/library/snmpSocketBaseDomain.h>
 
+#ifndef NETSNMP_NO_SYSTEMD
+#include <net-snmp/library/sd-daemon.h>
+#endif
+
 #if (defined(linux) && defined(IP_PKTINFO)) \
     || defined(IP_RECVDSTADDR) && HAVE_STRUCT_MSGHDR_MSG_CONTROL \
                                && HAVE_STRUCT_MSGHDR_MSG_FLAGS
@@ -67,6 +71,7 @@ netsnmp_udpipv4base_transport(struct sockaddr_in *addr, int local)
     char           *client_socket = NULL;
     netsnmp_indexed_addr_pair addr_pair;
     socklen_t       local_addr_len;
+    int             socket_initialized = 0;
 
 #ifdef NETSNMP_NO_LISTEN_SUPPORT
     if (local)
@@ -91,7 +96,19 @@ netsnmp_udpipv4base_transport(struct sockaddr_in *addr, int local)
         free(str);
     }
 
-    t->sock = socket(PF_INET, SOCK_DGRAM, 0);
+#ifndef NETSNMP_NO_SYSTEMD
+    /*
+     * Maybe the socket was already provided by systemd...
+     */
+    if (local) {
+        t->sock = netsnmp_sd_find_inet_socket(PF_INET, SOCK_DGRAM, -1,
+                ntohs(addr->sin_port));
+        if (t->sock)
+            socket_initialized = 1;
+    }
+#endif
+    if (!socket_initialized)
+        t->sock = (int) socket(PF_INET, SOCK_DGRAM, 0);
     DEBUGMSGTL(("UDPBase", "openned socket %d as local=%d\n", t->sock, local)); 
     if (t->sock < 0) {
         netsnmp_transport_free(t);
@@ -141,12 +158,14 @@ netsnmp_udpipv4base_transport(struct sockaddr_in *addr, int local)
             DEBUGMSGTL(("netsnmp_udp", "set IP_RECVDSTADDR\n"));
         }
 #endif
-        rc = bind(t->sock, (struct sockaddr *) addr,
-                  sizeof(struct sockaddr));
-        if (rc != 0) {
-            netsnmp_socketbase_close(t);
-            netsnmp_transport_free(t);
-            return NULL;
+        if (!socket_initialized) {
+            rc = bind(t->sock, (struct sockaddr *) addr,
+                    sizeof(struct sockaddr));
+            if (rc != 0) {
+                netsnmp_socketbase_close(t);
+                netsnmp_transport_free(t);
+                return NULL;
+            }
         }
         t->data = NULL;
         t->data_length = 0;
@@ -163,8 +182,29 @@ netsnmp_udpipv4base_transport(struct sockaddr_in *addr, int local)
                                               NETSNMP_DS_LIB_CLIENT_ADDR);
         if (client_socket) {
             struct sockaddr_in client_addr;
-            netsnmp_sockaddr_in2(&client_addr, client_socket, NULL);
-            client_addr.sin_port = 0;
+
+            char *client_address = client_socket;
+            int uses_port = netsnmp_ds_get_boolean(NETSNMP_DS_LIBRARY_ID,
+                                                   NETSNMP_DS_LIB_CLIENT_ADDR_USES_PORT);
+            if ((uses_port == 1) && (strchr(client_socket, ':') == NULL)) {
+                client_address = malloc(strlen(client_socket) + 3);
+                if (client_address == NULL) {
+                    netsnmp_socketbase_close(t);
+                    netsnmp_transport_free(t);
+                    return NULL;
+                }                                      /* if NETSNMP_DS_LIB_CLIENT_ADDR */
+                strcpy(client_address, client_socket); /* expects a port but there is none */
+                strcat(client_address, ":0");          /* specified then provide ephemeral one */
+            }
+
+            netsnmp_sockaddr_in2(&client_addr, client_address, NULL);
+            if (uses_port == 0) {
+                client_addr.sin_port = 0;
+            }
+            if (client_address != client_socket) {
+                free(client_address);
+            }
+
             DEBUGMSGTL(("netsnmp_udpbase", "binding socket: %d\n", t->sock));
             rc = bind(t->sock, (struct sockaddr *)&client_addr,
                   sizeof(struct sockaddr));

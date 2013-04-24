@@ -4,6 +4,7 @@
 SHELL		= @SHELL@
 srcdir		= @srcdir@
 top_srcdir	= @top_srcdir@
+top_builddir	= @top_builddir@
 VERSION		= @VERSION@
 @SET_MAKE@
 
@@ -81,7 +82,7 @@ LINKCC	        = @LINKCC@
 #
 LIBCURRENT  = 30
 LIBAGE      = 0
-LIBREVISION = 2
+LIBREVISION = 1
 
 LIB_LD_CMD      = $(LIBTOOL) --mode=link $(LINKCC) $(CFLAGS) -rpath $(libdir) -version-info $(LIBCURRENT):$(LIBREVISION):$(LIBAGE) -o
 LIB_EXTENSION   = la
