@@ -9,7 +9,7 @@
  * Added text <special options> to usage().
  */
 /**********************************************************************
-	Copyright 1997 Niels Baggesen
+        Copyright 1997 Niels Baggesen
 
                       All Rights Reserved
 
@@ -115,55 +115,55 @@ optProc(int argc, char *const *argv, int opt)
         while (*optarg) {
             switch (*optarg++) {
             case 'w':
-		if (optind < argc) {
-		    if (argv[optind]) {
-			max_width = atoi(argv[optind]);
-			if (max_width == 0) {
-			    usage();
-			    fprintf(stderr, "Bad -Cw option: %s\n", 
-				    argv[optind]);
-			    exit(1);
-			}
-		    }
-		} else {
-		    usage();
+                if (optind < argc) {
+                    if (argv[optind]) {
+                        max_width = atoi(argv[optind]);
+                        if (max_width == 0) {
+                            usage();
+                            fprintf(stderr, "Bad -Cw option: %s\n", 
+                                    argv[optind]);
+                            exit(1);
+                        }
+                    }
+                } else {
+                    usage();
                     fprintf(stderr, "Bad -Cw option: no argument given\n");
-		    exit(1);
-		}
-		optind++;
+                    exit(1);
+                }
+                optind++;
                 break;
             case 'c':
-		if (optind < argc) {
-		    if (argv[optind]) {
-			column_width = atoi(argv[optind]);
-			if (column_width <= 2) {
-			    usage();
-			    fprintf(stderr, "Bad -Cc option: %s\n", 
-				    argv[optind]);
-			    exit(1);
-			}
+                if (optind < argc) {
+                    if (argv[optind]) {
+                        column_width = atoi(argv[optind]);
+                        if (column_width <= 2) {
+                            usage();
+                            fprintf(stderr, "Bad -Cc option: %s\n", 
+                                    argv[optind]);
+                            exit(1);
+                        }
                         /* Reduce by one for space at end of column */
                         column_width -= 1;
-		    }
-		} else {
-		    usage();
+                    }
+                } else {
+                    usage();
                     fprintf(stderr, "Bad -Cc option: no argument given\n");
-		    exit(1);
-		}
-		optind++;
+                    exit(1);
+                }
+                optind++;
                 break;
             case 'l':
                 left_justify_flag = "-";
                 break;
             case 'f':
-		if (optind < argc) {
-		    field_separator = argv[optind];
-		} else {
+                if (optind < argc) {
+                    field_separator = argv[optind];
+                } else {
                     usage();
-		    fprintf(stderr, "Bad -Cf option: no argument given\n");
-		    exit(1);
-		}
-		optind++;
+                    fprintf(stderr, "Bad -Cf option: no argument given\n");
+                    exit(1);
+                }
+                optind++;
                 break;
             case 'h':
                 headers_only = 1;
@@ -181,22 +181,22 @@ optProc(int argc, char *const *argv, int opt)
                 show_index = 1;
                 break;
             case 'r':
-		if (optind < argc) {
-		    if (argv[optind]) {
-			max_getbulk = atoi(argv[optind]);
-			if (max_getbulk == 0) {
-			    usage();
-			    fprintf(stderr, "Bad -Cr option: %s\n", 
-				    argv[optind]);
-			    exit(1);
-			}
-		    }
-		} else {
-		    usage();
+                if (optind < argc) {
+                    if (argv[optind]) {
+                        max_getbulk = atoi(argv[optind]);
+                        if (max_getbulk == 0) {
+                            usage();
+                            fprintf(stderr, "Bad -Cr option: %s\n", 
+                                    argv[optind]);
+                            exit(1);
+                        }
+                    }
+                } else {
+                    usage();
                     fprintf(stderr, "Bad -Cr option: no argument given\n");
-		    exit(1);
-		}
-		optind++;
+                    exit(1);
+                }
+                optind++;
                 break;
             default:
                 fprintf(stderr, "Bad option after -C: %c\n", optarg[-1]);
@@ -216,7 +216,7 @@ usage(void)
     fprintf(stderr, " TABLE-OID\n\n");
     snmp_parse_args_descriptions(stderr);
     fprintf(stderr,
-	    "  -C APPOPTS\t\tSet various application specific behaviours:\n");
+            "  -C APPOPTS\t\tSet various application specific behaviours:\n");
     fprintf(stderr, "\t\t\t  b:       brief field names\n");
     fprintf(stderr, "\t\t\t  B:       do not use GETBULK requests\n");
     fprintf(stderr, "\t\t\t  c<NUM>:  print table in columns of <NUM> chars width\n");
@@ -351,7 +351,7 @@ main(int argc, char *argv[])
     if (total_entries == 0)
         printf("%s: No entries\n", table_name);
     if (extra_columns)
-	printf("%s: WARNING: More columns on agent than in MIB\n", table_name);
+        printf("%s: WARNING: More columns on agent than in MIB\n", table_name);
 
     return 0;
 }
@@ -661,15 +661,16 @@ get_table_entries(netsnmp_session * ss)
                 end_of_table = 1;       /* assume end of table */
                 have_current_index = 0;
                 name_length = rootlen + 1;
+
                 for (vars = response->variables; vars;
                      vars = vars->next_variable) {
                     col++;
                     name[rootlen] = column[col].subid;
+
                     if ((vars->name_length < name_length) ||
                         (vars->name[rootlen] != column[col].subid) ||
-                        memcmp(name, vars->name,
-                               name_length * sizeof(oid)) != 0
-                        || vars->type == SNMP_ENDOFMIBVIEW) {
+                        //FIXME memcmp(name, vars->name, name_length * sizeof(oid)) != 0 ||
+                        vars->type == SNMP_ENDOFMIBVIEW) {
                         /*
                          * not part of this subtree 
                          */
@@ -680,6 +681,23 @@ get_table_entries(netsnmp_session * ss)
                         }
                         continue;
                     }
+
+                    //================================
+                    //FIXME handle sparse table right!
+                    if ((memcmp(name, vars->name, name_length * sizeof(oid)) != 0)
+                        && have_current_index) {
+                        have_current_index = 0;
+                        if (localdebug || show_index) {
+                            entries++;
+                            dp = data + (entries - 1) * fields;
+                            if (localdebug) {
+                                fprint_variable(stderr, vars->name,
+                                                vars->name_length, vars);
+                                fprintf(stderr, " => FIXME: new row\n");
+                            }
+                        }
+                    }
+                    //================================
 
                     /*
                      * save index off 
@@ -705,7 +723,7 @@ get_table_entries(netsnmp_session * ss)
                                 switch (netsnmp_ds_get_int(NETSNMP_DS_LIBRARY_ID,
                                                           NETSNMP_DS_LIB_OID_OUTPUT_FORMAT)) {
                                 case NETSNMP_OID_OUTPUT_MODULE:
-				case 0:
+                                case 0:
                                     name_p = strchr(buf, ':');
                                     break;
                                 case NETSNMP_OID_OUTPUT_SUFFIX:
@@ -717,11 +735,11 @@ get_table_entries(netsnmp_session * ss)
                                     name_p = buf + strlen(table_name)+1;
                                     name_p = strchr(name_p, '.')+1;
                                     break;
-				default:
-				    fprintf(stderr, "Unrecognized -O option: %d\n",
-					    netsnmp_ds_get_int(NETSNMP_DS_LIBRARY_ID,
-							      NETSNMP_DS_LIB_OID_OUTPUT_FORMAT));
-				    exit(1);
+                                default:
+                                    fprintf(stderr, "Unrecognized -O option: %d\n",
+                                            netsnmp_ds_get_int(NETSNMP_DS_LIBRARY_ID,
+                                                              NETSNMP_DS_LIB_OID_OUTPUT_FORMAT));
+                                    exit(1);
                                 }
                                 name_p = strchr(name_p, '.') + 1;
                             }
@@ -868,12 +886,12 @@ getbulk_table_entries(netsnmp_session * ss)
                     for (col = 0; col < fields; col++)
                         if (column[col].subid == vars->name[rootlen])
                             break;
-		    if (col == fields) {
-			extra_columns = 1;
-			last_var = vars;
-			vars = vars->next_variable;
-			continue;
-		    }
+                    if (col == fields) {
+                        extra_columns = 1;
+                        last_var = vars;
+                        vars = vars->next_variable;
+                        continue;
+                    }
                     if (netsnmp_ds_get_boolean(NETSNMP_DS_LIBRARY_ID, 
                                               NETSNMP_DS_LIB_EXTENDED_INDEX)) {
                         name_p = strchr(buf, '[');
@@ -881,7 +899,7 @@ getbulk_table_entries(netsnmp_session * ss)
                         switch (netsnmp_ds_get_int(NETSNMP_DS_LIBRARY_ID,
                                                   NETSNMP_DS_LIB_OID_OUTPUT_FORMAT)) {
                         case NETSNMP_OID_OUTPUT_MODULE:
-			case 0:
+                        case 0:
                             name_p = strchr(buf, ':')+1;
                             break;
                         case NETSNMP_OID_OUTPUT_SUFFIX:
@@ -893,11 +911,11 @@ getbulk_table_entries(netsnmp_session * ss)
                             name_p = buf + strlen(table_name)+1;
                             name_p = strchr(name_p, '.')+1;
                             break;
-			default:
-			    fprintf(stderr, "Unrecognized -O option: %d\n",
-				    netsnmp_ds_get_int(NETSNMP_DS_LIBRARY_ID,
-					              NETSNMP_DS_LIB_OID_OUTPUT_FORMAT));
-			    exit(1);
+                        default:
+                            fprintf(stderr, "Unrecognized -O option: %d\n",
+                                    netsnmp_ds_get_int(NETSNMP_DS_LIBRARY_ID,
+                                                      NETSNMP_DS_LIB_OID_OUTPUT_FORMAT));
+                            exit(1);
                         }
                         name_p = strchr(name_p, '.');
                         if ( name_p == NULL ) {
