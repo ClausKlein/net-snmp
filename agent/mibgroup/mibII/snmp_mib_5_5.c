@@ -16,7 +16,7 @@ netsnmp_feature_require(check_vb_truthvalue)
 
 #define SNMP_OID 1, 3, 6, 1, 2, 1, 11
 
-static oid snmp_oid[] = { SNMP_OID };
+static const oid snmp_oid[] = { SNMP_OID };
 
 extern long snmp_enableauthentraps;
 extern int snmp_enableauthentrapsset;
@@ -45,6 +45,7 @@ handle_truthvalue(netsnmp_mib_handler *handler,
         int res = netsnmp_check_vb_truthvalue(requests->requestvb);
         if (res != SNMP_ERR_NOERROR)
             netsnmp_request_set_error(requests, res);
+            return res;
     }
 #endif /* !NETSNMP_NO_WRITE_SUPPORT */
     return SNMP_ERR_NOERROR;
@@ -66,7 +67,7 @@ handle_snmp(netsnmp_mib_handler *handler,
     case 7:
     case 23:
     case 30:
-        netsnmp_set_request_error(reqinfo, requests, SNMP_NOSUCHOBJECT);
+        netsnmp_set_request_error(reqinfo, requests, SNMP_NOSUCHOBJECT);        // NOTE: need to return OK! ck
         break;
     default:
 	break;
@@ -90,32 +91,26 @@ init_snmp_mib_5_5(void)
         netsnmp_create_handler_registration(
             "mibII/snmp", handle_snmp, snmp_oid, OID_LENGTH(snmp_oid),
             HANDLER_CAN_RONLY),
-        1, SNMP);
+        1, SNMP);       //TODO this is a magic HACK: SNMP meens STAT_SNMP_STATS_START and STAT_SNMP_STATS_END; ck
     {
-        oid snmpEnableAuthenTraps_oid[] = { SNMP_OID, 30, 0 };
-	static netsnmp_watcher_info enableauthen_info;
-        netsnmp_handler_registration *reg =
-#ifndef NETSNMP_NO_WRITE_SUPPORT
+        const oid snmpEnableAuthenTraps_oid[] = { SNMP_OID, 30 };
+        static netsnmp_watcher_info enableauthen_info;
+        if (netsnmp_register_watched_scalar(    //TODO trigger snmp_store_needed() after commit
             netsnmp_create_update_handler_registration(
                 "mibII/snmpEnableAuthenTraps",
                 snmpEnableAuthenTraps_oid,
                 OID_LENGTH(snmpEnableAuthenTraps_oid),
-                HANDLER_CAN_RWRITE, &snmp_enableauthentrapsset);
-#else  /* !NETSNMP_NO_WRITE_SUPPORT */
-            netsnmp_create_update_handler_registration(
-                "mibII/snmpEnableAuthenTraps",
-                snmpEnableAuthenTraps_oid,
-                OID_LENGTH(snmpEnableAuthenTraps_oid),
-                HANDLER_CAN_RONLY, &snmp_enableauthentrapsset);
-#endif /* !NETSNMP_NO_WRITE_SUPPORT */
-
-        netsnmp_inject_handler(reg, netsnmp_get_truthvalue());
-        netsnmp_register_watched_instance(
-            reg,
+#ifdef NETSNMP_NO_WRITE_SUPPORT
+                HANDLER_CAN_RONLY,
+#else
+                HANDLER_CAN_RWRITE,
+#endif
+                &snmp_enableauthentrapsset),
             netsnmp_init_watcher_info(
-		&enableauthen_info,
+                &enableauthen_info,
                 &snmp_enableauthentraps, sizeof(snmp_enableauthentraps),
-                ASN_INTEGER, WATCHER_FIXED_SIZE));
+                ASN_INTEGER, WATCHER_FIXED_SIZE)))
+            DEBUGMSGTL(("snmpEnableAuthenTraps", "netsnmp_register_watched_scalar() failed\n"));
     }
 
 #ifdef USING_MIBII_SYSTEM_MIB_MODULE
