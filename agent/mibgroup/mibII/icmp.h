@@ -13,6 +13,7 @@ config_arch_require(freebsd6,  mibII/kernel_sysctl)
 config_arch_require(freebsd7,  mibII/kernel_sysctl)
 config_arch_require(freebsd8,  mibII/kernel_sysctl)
 config_arch_require(freebsd9,  mibII/kernel_sysctl)
+config_arch_require(freebsd10, mibII/kernel_sysctl)
 config_arch_require(netbsd,    mibII/kernel_netbsd)
 config_arch_require(netbsdelf, mibII/kernel_netbsd)
 config_arch_require(openbsd4,  mibII/kernel_sysctl)
@@ -22,6 +23,7 @@ config_arch_require(dragonfly3, mibII/kernel_sysctl)
 config_arch_require(darwin10,  mibII/kernel_sysctl)
 config_arch_require(darwin11,  mibII/kernel_sysctl)
 config_arch_require(darwin12,  mibII/kernel_sysctl)
+config_arch_require(darwin13,  mibII/kernel_sysctl)
 
 #include <net-snmp/agent/cache_handler.h>
 

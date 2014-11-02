@@ -176,7 +176,7 @@ tcpprotopr_get(const char *name, oid *root, size_t root_len)
         return;
     if (netsnmp_query_walk( var, ss ) != SNMP_ERR_NOERROR)
         return;
-    if (var->type == ASN_NULL)
+    if ((var->type & 0xF0) == 0x80)	/* Exception */
 	return;
 
     for (vp = var; vp ; vp=vp->next_variable) {
@@ -214,7 +214,7 @@ udpprotopr(const char *name)
         return;
     if (netsnmp_query_walk( var, ss ) != SNMP_ERR_NOERROR)
         return;
-    if (var->type == ASN_NULL)
+    if ((var->type & 0xF0) == 0x80)	/* Exception */
 	return;
 
     printf("Active Internet (%s) Connections\n", name);
@@ -454,31 +454,31 @@ icmp_stats(const char *name)
         { 0, ""}
     };
     struct stat_table icmp_inhistogram[] = {
-        { 3, "Destination unreachable: %d"},
-        { 4, "Time Exceeded: %d"},
-        { 5, "Parameter Problem: %d"},
-        { 6, "Source Quench: %d"},
-        { 7, "Redirect: %d"},
-        { 8, "Echo Request: %d"},
-        { 9, "Echo Reply: %d"},
-        {10, "Timestamp Request: %d"},
-        {11, "Timestamp Reply: %d"},
-        {12, "Address Mask Request: %d"},
-        {13, "Address Mask Reply: %d"},
+        { 3, "        Destination unreachable: %d"},
+        { 4, "        Time Exceeded: %d"},
+        { 5, "        Parameter Problem: %d"},
+        { 6, "        Source Quench: %d"},
+        { 7, "        Redirect: %d"},
+        { 8, "        Echo Request: %d"},
+        { 9, "        Echo Reply: %d"},
+        {10, "        Timestamp Request: %d"},
+        {11, "        Timestamp Reply: %d"},
+        {12, "        Address Mask Request: %d"},
+        {13, "        Address Mask Reply: %d"},
         { 0, ""}
     };
     struct stat_table icmp_outhistogram[] = {
-        {16, "Destination unreachable: %d"},
-        {17, "Time Exceeded: %d"},
-        {18, "Parameter Problem: %d"},
-        {19, "Source Quench: %d"},
-        {20, "Redirect: %d"},
-        {21, "Echo Request: %d"},
-        {22, "Echo Reply: %d"},
-        {23, "Timestamp Request: %d"},
-        {24, "Timestamp Reply: %d"},
-        {25, "Address Mask Request: %d"},
-        {26, "Address Mask Reply: %d"},
+        {16, "        Destination unreachable: %d"},
+        {17, "        Time Exceeded: %d"},
+        {18, "        Parameter Problem: %d"},
+        {19, "        Source Quench: %d"},
+        {20, "        Redirect: %d"},
+        {21, "        Echo Request: %d"},
+        {22, "        Echo Reply: %d"},
+        {23, "        Timestamp Request: %d"},
+        {24, "        Timestamp Reply: %d"},
+        {25, "        Address Mask Request: %d"},
+        {26, "        Address Mask Reply: %d"},
         {0, ""}
     };
 
@@ -503,7 +503,7 @@ tcp_stats(const char *name)
         { 6, "%14d passive open%s"},
         { 7, "%14d failed attempt%s"},
         { 8, "%14d reset%s of established connections"},
-        { 9, "%14d current established connection%s"},
+        { 9, "%14d currently established connection%s"},
         {10, "%14d segment%s received"},
         {11, "%14d segment%s sent"},
         {12, "%14d segment%s retransmitted"},
@@ -511,7 +511,7 @@ tcp_stats(const char *name)
         {15, "%14d reset%s sent"},
         { 0, ""}
     };
-    _dump_stats( name, tcpstats_oid, tcpstats_len, tcpstats_tbl );
+    _dump_stats( "tcp", tcpstats_oid, tcpstats_len, tcpstats_tbl );
 }
 
 
@@ -530,7 +530,7 @@ udp_stats(const char *name)
         {4, "%14d output datagram request%s"},
         {0, ""}
     };
-    _dump_stats( name, udpstats_oid, udpstats_len, udpstats_tbl );
+    _dump_stats( "udp", udpstats_oid, udpstats_len, udpstats_tbl );
 }
 
 
@@ -605,9 +605,10 @@ inetname(struct in_addr *inp)
 #endif
 
 	if (first && !nflag) {
+		char tmp[MAXHOSTNAMELEN];
 		first = 0;
-		if (gethostname(domain, sizeof(domain)) == 0 &&
-		    (cp = strchr(domain, '.')))
+		if (gethostname(tmp, sizeof(tmp)) == 0 &&
+		    (cp = strchr(tmp, '.')))
 			(void) strlcpy(domain, cp + 1, sizeof domain);
 		else
 			domain[0] = '\0';

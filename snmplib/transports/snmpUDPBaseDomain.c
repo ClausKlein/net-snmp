@@ -268,7 +268,15 @@ int netsnmp_udpbase_sendto(int fd, struct in_addr *srcip, int if_index,
             struct in_pktinfo ipi;
 
             memset(&ipi, 0, sizeof(ipi));
-            ipi.ipi_ifindex = if_index;
+            /*
+             * Except in the case of responding
+             * to a broadcast, setting the ifindex
+             * when responding results in incorrect
+             * behavior of changing the source address
+             * that the manager sees the response
+             * come from.
+             */
+            ipi.ipi_ifindex = 0;
 #if defined(cygwin)
             ipi.ipi_addr.s_addr = srcip->s_addr;
 #else
@@ -378,7 +386,7 @@ netsnmp_udpbase_recv(netsnmp_transport *t, void *buf, int size,
                      void **opaque, int *olength)
 {
     int             rc = -1;
-    socklen_t       fromlen = sizeof(struct sockaddr);
+    socklen_t       fromlen = sizeof(netsnmp_sockaddr_storage);
     netsnmp_indexed_addr_pair *addr_pair = NULL;
     struct sockaddr *from;
 

@@ -104,6 +104,7 @@ struct icmp6_mib {
     unsigned long icmp6OutPktTooBigs;
     unsigned long icmp6OutTimeExcds;
     unsigned long icmp6OutParmProblems;
+    unsigned long icmp6OutEchos;
     unsigned long icmp6OutEchoReplies;
     unsigned long icmp6OutRouterSolicits;
     unsigned long icmp6OutNeighborSolicits;
@@ -120,11 +121,11 @@ struct icmp_msg_mib {
 
 /* Lets use wrapper structures for future expansion */
 struct icmp4_msg_mib {
-    struct icmp_msg_mib vals[255];
+    struct icmp_msg_mib vals[256];
 };
 
 struct icmp6_msg_mib {
-    struct icmp_msg_mib vals[255];
+    struct icmp_msg_mib vals[256];
 };
 
 struct udp_mib {

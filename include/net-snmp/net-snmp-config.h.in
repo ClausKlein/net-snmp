@@ -350,6 +350,9 @@
 /* Define to 1 if you have the `mld' library (-lmld). */
 #undef HAVE_LIBMLD
 
+/* Define to 1 if <netlink/netlink.h> provides the libnl3 API */
+#undef HAVE_LIBNL3
+
 /* define if you have libnm */
 #undef HAVE_LIBNM
 
@@ -361,6 +364,9 @@
 
 /* Define to 1 if you have the `pkcs11' library (-lpkcs11). */
 #undef HAVE_LIBPKCS11
+
+/* define if you have BSD pkg-ng */
+#undef HAVE_LIBPKG
 
 /* Define to 1 if you have the `pthread' library (-lpthread). */
 #undef HAVE_LIBPTHREAD
@@ -631,6 +637,9 @@
 
 /* Define to 1 if you have the <pkglocs.h> header file. */
 #undef HAVE_PKGLOCS_H
+
+/* Define to 1 if you have the <pkg.h> header file. */
+#undef HAVE_PKG_H
 
 /* Define to 1 if you have the `poll' function. */
 #undef HAVE_POLL
@@ -1010,6 +1019,9 @@
 
 /* Define to 1 if `udps_opackets' is a member of `struct udpstat'. */
 #undef HAVE_STRUCT_UDPSTAT_UDPS_OPACKETS
+
+/* Define to 1 if `pgswapin' is a member of `struct uvmexp'. */
+#undef HAVE_STRUCT_UVMEXP_PGSWAPIN
 
 /* Define to 1 if you have the `sysconf' function. */
 #undef HAVE_SYSCONF

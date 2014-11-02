@@ -57,7 +57,7 @@
 
 #endif
 
-int
+static int
 _fsys_remote( char *device, int type )
 {
     if (( type == NETSNMP_FS_TYPE_NFS) ||
@@ -67,7 +67,7 @@ _fsys_remote( char *device, int type )
         return 0;
 }
 
-int
+static int
 _fsys_type( char *typename )
 {
     DEBUGMSGTL(("fsys:type", "Classifying %s\n", typename));
@@ -103,7 +103,9 @@ _fsys_type( char *typename )
               !strcmp(typename, MNTTYPE_NFS3) ||
               !strcmp(typename, MNTTYPE_NFS4) ||
               !strcmp(typename, MNTTYPE_CIFS) ||  /* i.e. SMB - ?? */
-              !strcmp(typename, MNTTYPE_SMBFS)    /* ?? */ )
+              !strcmp(typename, MNTTYPE_SMBFS) || /* ?? */
+              /* mvfs (IBM ClearCase) is nfs-like in nature */
+              !strcmp(typename, MNTTYPE_MVFS))
        return NETSNMP_FS_TYPE_NFS;
     else if ( !strcmp(typename, MNTTYPE_NCPFS) )
        return NETSNMP_FS_TYPE_NETWARE;
@@ -129,8 +131,7 @@ _fsys_type( char *typename )
      *    (The systems listed are not fixed in stone,
      *     but are simply here to illustrate the principle!)
      */    
-    else if ( !strcmp(typename, MNTTYPE_MVFS) ||
-              !strcmp(typename, MNTTYPE_TMPFS) ||
+    else if ( !strcmp(typename, MNTTYPE_TMPFS) ||
               !strcmp(typename, MNTTYPE_GFS) ||
               !strcmp(typename, MNTTYPE_GFS2) ||
               !strcmp(typename, MNTTYPE_XFS) ||
@@ -141,6 +142,8 @@ _fsys_type( char *typename )
               !strcmp(typename, MNTTYPE_CVFS) ||
               !strcmp(typename, MNTTYPE_SIMFS) ||
               !strcmp(typename, MNTTYPE_BTRFS) ||
+              !strcmp(typename, MNTTYPE_ZFS) ||
+              !strcmp(typename, MNTTYPE_ACFS) ||
               !strcmp(typename, MNTTYPE_LOFS))
        return NETSNMP_FS_TYPE_OTHER;
 

@@ -124,7 +124,7 @@ tcp6protopr(const char *name)
                                      ASN_NULL, NULL,  0);
     if (netsnmp_query_walk( var, ss ) != SNMP_ERR_NOERROR)
         return;
-    if (var->type == ASN_NULL)	/* No entries */
+    if ((var->type & 0xF0) == 0x80)		/* exception */
         return;
 
     for (vp = var; vp ; vp=vp->next_variable) {
@@ -184,7 +184,7 @@ udp6protopr(const char *name)
                                      ASN_NULL, NULL,  0);
     if (netsnmp_query_walk( var, ss ) != SNMP_ERR_NOERROR)
         return;
-    if (var->type == ASN_NULL)	/* No entries */
+    if ((var->type & 0xF0) == 0x80)		/* exception */
         return;
 
     printf("Active Internet Connections\n");
@@ -244,6 +244,8 @@ _dump_v6stats( const char *name, oid *oid_buf, size_t buf_len,
      */
     while (1) {
         if (netsnmp_query_getnext( var, ss ) != SNMP_ERR_NOERROR)
+            break;
+        if ((var->type & 0xF0) == 0x80)		/* exception */
             break;
         if ( snmp_oid_compare( oid_buf,   buf_len,
                                var->name, buf_len) != 0 )
@@ -337,39 +339,39 @@ icmp6_stats(const char *name)
         { 0, ""}
     };
     struct stat_table icmp6_inhistogram[] = {
-        { 3, "Destination unreachable: %d"},
-        { 4, "Admin Prohibit: %d"},
-        { 5, "Time Exceeded: %d"},
-        { 6, "Parameter Problem: %d"},
-        { 7, "Too Big: %d"},
-        { 8, "Echo Request: %d"},
-        { 9, "Echo Reply: %d"},
-        {10, "Router Solicit: %d"},
-        {11, "Router Advert: %d"},
-        {12, "Neighbor Solicit: %d"},
-        {13, "Neighbor Advert: %d"},
-        {14, "Redirect: %d"},
-        {15, "Group Member Request: %d"},
-        {16, "Group Member Reply:%d"},
-        {17, "Group Member Reduce:%d"},
+        { 3, "        Destination unreachable: %d"},
+        { 4, "        Admin Prohibit: %d"},
+        { 5, "        Time Exceeded: %d"},
+        { 6, "        Parameter Problem: %d"},
+        { 7, "        Too Big: %d"},
+        { 8, "        Echo Request: %d"},
+        { 9, "        Echo Reply: %d"},
+        {10, "        Router Solicit: %d"},
+        {11, "        Router Advert: %d"},
+        {12, "        Neighbor Solicit: %d"},
+        {13, "        Neighbor Advert: %d"},
+        {14, "        Redirect: %d"},
+        {15, "        Group Member Request: %d"},
+        {16, "        Group Member Reply: %d"},
+        {17, "        Group Member Reduce: %d"},
         { 0, ""}
     };
     struct stat_table icmp6_outhistogram[] = {
-        {20, "Destination unreachable: %d"},
-        {21, "Admin Prohibit: %d"},
-        {22, "Time Exceeded: %d"},
-        {23, "Parameter Problem: %d"},
-        {24, "Too Big: %d"},
-        {25, "Echo Request: %d"},
-        {26, "Echo Reply: %d"},
-        {27, "Router Solicit: %d"},
-        {28, "Router Advert: %d"},
-        {29, "Neighbor Solicit: %d"},
-        {30, "Neighbor Advert: %d"},
-        {31, "Redirect: %d"},
-        {32, "Group Member Request: %d"},
-        {33, "Group Member Reply:%d"},
-        {34, "Group Member Reduce:%d"},
+        {20, "        Destination unreachable: %d"},
+        {21, "        Admin Prohibit: %d"},
+        {22, "        Time Exceeded: %d"},
+        {23, "        Parameter Problem: %d"},
+        {24, "        Too Big: %d"},
+        {25, "        Echo Request: %d"},
+        {26, "        Echo Reply: %d"},
+        {27, "        Router Solicit: %d"},
+        {28, "        Router Advert: %d"},
+        {29, "        Neighbor Solicit: %d"},
+        {30, "        Neighbor Advert: %d"},
+        {31, "        Redirect: %d"},
+        {32, "        Group Member Request: %d"},
+        {33, "        Group Member Reply: %d"},
+        {34, "        Group Member Reduce: %d"},
         {0, ""}
     };
 
@@ -413,7 +415,7 @@ inet6print(unsigned char *in6, int port, const char *proto, int local)
 
 	struct servent *sp = NULL;
 	char line[80], *cp;
-	unsigned width = 27-9;
+	int width = 27-9;
 	int len = sizeof line;
 
 	if (vflag && width < strlen(inet6name(in6)))
@@ -460,8 +462,8 @@ inet6name(const unsigned char *in6)
 
 	if (first && !nflag) {
 		first = 0;
-		if (gethostname(domain, sizeof(domain)) == 0 &&
-		    (cp = strchr(domain, '.')))
+		if (gethostname(line, sizeof(line)) == 0 &&
+		    (cp = strchr(line, '.')))
 			(void) strlcpy(domain, cp + 1, sizeof domain);
 		else
 			domain[0] = '\0';

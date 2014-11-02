@@ -1276,8 +1276,8 @@ snmpv3_probe_contextEngineID_rfc5343(void *slp, netsnmp_session *session) {
     }
     pdu->securityLevel = SNMP_SEC_LEVEL_NOAUTH;
     pdu->securityModel = session->securityModel;
-    if (memdup(&pdu->contextEngineID, probeEngineID, probeEngineID_len) !=
-        SNMPERR_SUCCESS) {
+    pdu->contextEngineID = netsnmp_memdup(probeEngineID, probeEngineID_len);
+    if (!pdu->contextEngineID) {
         snmp_log(LOG_ERR, "failed to clone memory for rfc5343 probe\n");
         snmp_free_pdu(pdu);
         return SNMP_ERR_GENERR;
@@ -1304,18 +1304,20 @@ snmpv3_probe_contextEngineID_rfc5343(void *slp, netsnmp_session *session) {
         ASN_OCTET_STR == response->variables->type  &&
         NULL != response->variables->val.string &&
         response->variables->val_len > 0) {
-        if (memdup(&session->contextEngineID,
-                   response->variables->val.string,
-                   response->variables->val_len) != SNMPERR_SUCCESS) {
+        session->contextEngineID =
+            netsnmp_memdup(response->variables->val.string,
+                           response->variables->val_len);
+        if (!session->contextEngineID) {
             snmp_log(LOG_ERR, "failed rfc5343 contextEngineID probing: memory allocation failed\n");
             return SNMP_ERR_GENERR;
         }
         
         /* technically there likely isn't a securityEngineID but just
            in case anyone goes looking we might as well have one */
-        if (memdup(&session->securityEngineID,
-                   response->variables->val.string,
-                   response->variables->val_len) != SNMPERR_SUCCESS) {
+        session->securityEngineID =
+            netsnmp_memdup(response->variables->val.string,
+                           response->variables->val_len);
+        if (!session->securityEngineID) {
             snmp_log(LOG_ERR, "failed rfc5343 securityEngineID probing: memory allocation failed\n");
             return SNMP_ERR_GENERR;
         }
@@ -4352,6 +4354,7 @@ snmp_pdu_parse(netsnmp_pdu *pdu, u_char * data, size_t * length)
     size_t          four;
     netsnmp_variable_list *vp = NULL;
     oid             objid[MAX_OID_LEN];
+    u_char         *p;
 
     /*
      * Get the PDU type 
@@ -4528,10 +4531,10 @@ snmp_pdu_parse(netsnmp_pdu *pdu, u_char * data, size_t * length)
         case ASN_INTEGER:
             vp->val.integer = (long *) vp->buf;
             vp->val_len = sizeof(long);
-            data = asn_parse_int(var_val, &len, &vp->type,
+            p = asn_parse_int(var_val, &len, &vp->type,
                           (long *) vp->val.integer,
                           sizeof(*vp->val.integer));
-            if (!data)
+            if (!p)
                 return -1;
             break;
         case ASN_COUNTER:
@@ -4540,10 +4543,10 @@ snmp_pdu_parse(netsnmp_pdu *pdu, u_char * data, size_t * length)
         case ASN_UINTEGER:
             vp->val.integer = (long *) vp->buf;
             vp->val_len = sizeof(u_long);
-            data = asn_parse_unsigned_int(var_val, &len, &vp->type,
+            p = asn_parse_unsigned_int(var_val, &len, &vp->type,
                                    (u_long *) vp->val.integer,
                                    vp->val_len);
-            if (!data)
+            if (!p)
                 return -1;
             break;
 #ifdef NETSNMP_WITH_OPAQUE_SPECIAL_TYPES
@@ -4553,37 +4556,37 @@ snmp_pdu_parse(netsnmp_pdu *pdu, u_char * data, size_t * length)
         case ASN_COUNTER64:
             vp->val.counter64 = (struct counter64 *) vp->buf;
             vp->val_len = sizeof(struct counter64);
-            data = asn_parse_unsigned_int64(var_val, &len, &vp->type,
+            p = asn_parse_unsigned_int64(var_val, &len, &vp->type,
                                      (struct counter64 *) vp->val.
                                      counter64, vp->val_len);
-            if (!data)
+            if (!p)
                 return -1;
             break;
 #ifdef NETSNMP_WITH_OPAQUE_SPECIAL_TYPES
         case ASN_OPAQUE_FLOAT:
             vp->val.floatVal = (float *) vp->buf;
             vp->val_len = sizeof(float);
-            data = asn_parse_float(var_val, &len, &vp->type,
+            p = asn_parse_float(var_val, &len, &vp->type,
                             vp->val.floatVal, vp->val_len);
-            if (!data)
+            if (!p)
                 return -1;
             break;
         case ASN_OPAQUE_DOUBLE:
             vp->val.doubleVal = (double *) vp->buf;
             vp->val_len = sizeof(double);
-            data = asn_parse_double(var_val, &len, &vp->type,
+            p = asn_parse_double(var_val, &len, &vp->type,
                              vp->val.doubleVal, vp->val_len);
-            if (!data)
+            if (!p)
                 return -1;
             break;
         case ASN_OPAQUE_I64:
             vp->val.counter64 = (struct counter64 *) vp->buf;
             vp->val_len = sizeof(struct counter64);
-            data = asn_parse_signed_int64(var_val, &len, &vp->type,
+            p = asn_parse_signed_int64(var_val, &len, &vp->type,
                                    (struct counter64 *) vp->val.counter64,
                                    sizeof(*vp->val.counter64));
 
-            if (!data)
+            if (!p)
                 return -1;
             break;
 #endif                          /* NETSNMP_WITH_OPAQUE_SPECIAL_TYPES */
@@ -4602,15 +4605,15 @@ snmp_pdu_parse(netsnmp_pdu *pdu, u_char * data, size_t * length)
             if (vp->val.string == NULL) {
                 return -1;
             }
-            data = asn_parse_string(var_val, &len, &vp->type, vp->val.string,
+            p = asn_parse_string(var_val, &len, &vp->type, vp->val.string,
                              &vp->val_len);
-            if (!data)
+            if (!p)
                 return -1;
             break;
         case ASN_OBJECT_ID:
             vp->val_len = MAX_OID_LEN;
-            data = asn_parse_objid(var_val, &len, &vp->type, objid, &vp->val_len);
-            if (!data)
+            p = asn_parse_objid(var_val, &len, &vp->type, objid, &vp->val_len);
+            if (!p)
                 return -1;
             vp->val_len *= sizeof(oid);
             vp->val.objid = (oid *) malloc(vp->val_len);
@@ -4629,9 +4632,9 @@ snmp_pdu_parse(netsnmp_pdu *pdu, u_char * data, size_t * length)
             if (vp->val.bitstring == NULL) {
                 return -1;
             }
-            data = asn_parse_bitstring(var_val, &len, &vp->type,
+            p = asn_parse_bitstring(var_val, &len, &vp->type,
                                 vp->val.bitstring, &vp->val_len);
-            if (!data)
+            if (!p)
                 return -1;
             break;
         default:
@@ -4928,7 +4931,7 @@ _sess_async_send(void *sessp,
      * specified in the received PDU.  
      */
 
-    if (session->sndMsgMaxSize != 0 && length > session->sndMsgMaxSize) {
+    if (pdu->version == SNMP_VERSION_3 && session->sndMsgMaxSize != 0 && length > session->sndMsgMaxSize) {
         DEBUGMSGTL(("sess_async_send",
                     "length of packet (%lu) exceeds session maximum (%lu)\n",
                     (unsigned long)length, (unsigned long)session->sndMsgMaxSize));
@@ -5327,13 +5330,17 @@ _sess_process_packet(void *sessp, netsnmp_session * sp,
 	      break;
 	    } else {
 	      /* We're done with retries, so no longer waiting for a response */
-	      ((struct synch_state*)magic)->waiting = 0;
+	      if (magic) {
+		((struct synch_state*)magic)->waiting = 0;
+	      }
 	    }
 	  } else {
 	    if (SNMPV3_IGNORE_UNAUTH_REPORTS) {
 	      break;
 	    } else { /* Set the state to no longer be waiting, since we're done with retries */
-	      ((struct synch_state*)magic)->waiting = 0;
+	      if (magic) {
+		((struct synch_state*)magic)->waiting = 0;
+	      }
 	    }
 	  }
 
@@ -5571,8 +5578,8 @@ _sess_read(void *sessp, netsnmp_large_fd_set * fdset)
              * We have no saved packet.  Allocate one.  
              */
             if ((isp->packet = (u_char *) malloc(rxbuf_len)) == NULL) {
-                DEBUGMSGTL(("sess_read", "can't malloc %lu bytes for rxbuf\n",
-                            (unsigned long)rxbuf_len));
+                DEBUGMSGTL(("sess_read", "can't malloc %" NETSNMP_PRIz
+                            "u bytes for rxbuf\n", rxbuf_len));
                 return 0;
             } else {
                 rxbuf = isp->packet;
@@ -5592,8 +5599,9 @@ _sess_read(void *sessp, netsnmp_large_fd_set * fdset)
                                        isp->packet_len + rxbuf_len);
                 if (newbuf == NULL) {
                     DEBUGMSGTL(("sess_read",
-                                "can't malloc %lu more for rxbuf (%lu tot)\n",
-                                (unsigned long)rxbuf_len, (unsigned long)(isp->packet_len + rxbuf_len)));
+                                "can't malloc %" NETSNMP_PRIz
+                                "u more for rxbuf (%" NETSNMP_PRIz "u tot)\n",
+                                rxbuf_len, isp->packet_len + rxbuf_len));
                     return 0;
                 } else {
                     isp->packet = newbuf;
@@ -5607,8 +5615,8 @@ _sess_read(void *sessp, netsnmp_large_fd_set * fdset)
         }
     } else {
         if ((rxbuf = (u_char *) malloc(rxbuf_len)) == NULL) {
-            DEBUGMSGTL(("sess_read", "can't malloc %lu bytes for rxbuf\n",
-                        (unsigned long)rxbuf_len));
+            DEBUGMSGTL(("sess_read", "can't malloc %" NETSNMP_PRIz
+                        "u bytes for rxbuf\n", rxbuf_len));
             return 0;
         }
     }
@@ -5677,9 +5685,10 @@ _sess_read(void *sessp, netsnmp_large_fd_set * fdset)
                 pdulen = asn_check_packet(pptr, isp->packet_len);
             }
 
-            DEBUGMSGTL(("sess_read", "  loop packet_len %lu, PDU length %lu\n",
-                        (unsigned long)isp->packet_len, (unsigned long)pdulen));
-             
+            DEBUGMSGTL(("sess_read",
+                        "  loop packet_len %" NETSNMP_PRIz "u, PDU length %"
+                        NETSNMP_PRIz "u\n", isp->packet_len, pdulen));
+
             if (pdulen > MAX_PACKET_LENGTH) {
                 /*
                  * Illegal length, drop the connection.  
@@ -5707,8 +5716,9 @@ _sess_read(void *sessp, netsnmp_large_fd_set * fdset)
                  * start, simply return and wait for more data to arrive.
                  */
                 DEBUGMSGTL(("sess_read",
-                            "pkt not complete (need %lu got %lu so far)\n",
-                            (unsigned long)pdulen, (unsigned long)isp->packet_len));
+                            "pkt not complete (need %" NETSNMP_PRIz "u got %"
+                            NETSNMP_PRIz "u so far)\n", pdulen,
+                            isp->packet_len));
 
                 if (pptr != isp->packet)
                     break; /* opaque freed for us outside of loop. */
@@ -5769,8 +5779,9 @@ _sess_read(void *sessp, netsnmp_large_fd_set * fdset)
              * Obviously this should never happen!  
              */
             snmp_log(LOG_ERR,
-                     "too large packet_len = %lu, dropping connection %d\n",
-                     (unsigned long)(isp->packet_len), transport->sock);
+                     "too large packet_len = %" NETSNMP_PRIz
+                     "u, dropping connection %d\n",
+                     isp->packet_len, transport->sock);
             transport->f_close(transport);
             /** XXX-rks: why no SNMP_FREE(isp->packet); ?? */
             return -1;
@@ -5795,9 +5806,11 @@ _sess_read(void *sessp, netsnmp_large_fd_set * fdset)
          */
 
         memmove(isp->packet, pptr, isp->packet_len);
-        DEBUGMSGTL(("sess_read", "end: memmove(%p, %p, %lu); realloc(%p, %lu)\n",
-                    isp->packet, pptr, (unsigned long)isp->packet_len,
-		    isp->packet, (unsigned long)isp->packet_len));
+        DEBUGMSGTL(("sess_read",
+                    "end: memmove(%p, %p, %" NETSNMP_PRIz "u); realloc(%p, %"
+                    NETSNMP_PRIz "u)\n",
+                    isp->packet, pptr, isp->packet_len,
+		    isp->packet, isp->packet_len));
 
         if ((rxbuf = (u_char *)realloc(isp->packet, isp->packet_len)) == NULL) {
             /*

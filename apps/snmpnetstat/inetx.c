@@ -232,7 +232,7 @@ tcpxprotopr(const char *name)
                                      ASN_NULL, NULL,  0);
     if (netsnmp_query_walk( var, ss ) != SNMP_ERR_NOERROR)
         return;
-    if (var->type == ASN_NULL) /* No entries */
+    if ((var->type & 0xF0) == 0x80)	/* Exception */
         return;
 
     for (vp = var; vp ; vp=vp->next_variable) {
@@ -244,11 +244,12 @@ tcpxprotopr(const char *name)
 	vp->name[inx-1] = 8;
 	snmp_varlist_add_variable( &pvar, vp->name, vp->name_length,
 					 ASN_NULL, NULL,  0);
-	if (netsnmp_query_get( pvar, ss ) != SNMP_ERR_NOERROR)
-	    abort();
-	if (var->type == ASN_NULL)    /* No entries */
-	    abort();
-	pid = *pvar->val.integer;
+	if (netsnmp_query_get( pvar, ss ) != SNMP_ERR_NOERROR) {
+	    snmp_free_var( pvar );
+	    return;
+	}
+	if ((pvar->type & 0xF0) != 0x80)	/* Exception */
+	    pid = *pvar->val.integer;
         
         /* Extract the local/remote information from the index values */
 	localType = vp->name[inx++];
@@ -268,22 +269,22 @@ tcpxprotopr(const char *name)
 	if (af == AF_INET6 && localType != 2) continue;
 
         if (first) {
-            printf("Active Internet (%s) Connections", name);
+            printf("Active Internet (%s) Connections", "tcp");
             putchar('\n');
             printf("%-5.5s %-27.27s %-27.27s %11.11s %5.5s\n",
                    "Proto", "Local Address", "Remote Address", "State", "PID");
             first = 0;
         }
 
-	strcpy(lname, name);
+	strcpy(lname, "tcp");
 	if (localType == 2) lname[3] = '6';
 	else lname[3] = '4';
 	lname[4] = 0;
         printf("%-5.5s", lname);
-        inetxprint(localType, localAddr,  localPort, name, 1);
-        inetxprint(remoteType, remoteAddr, remotePort, name, 0);
+        inetxprint(localType, localAddr,  localPort, "tcp", 1);
+        inetxprint(remoteType, remoteAddr, remotePort, "tcp", 0);
         if ( state < 1 || state > TCP_NSTATES )
-            printf(" %11d 5%d\n", pid, state );
+            printf(" %11d %5d\n", state, pid);
         else
             printf(" %11s %5d\n", tcpxstates[ state ], pid);
     }
@@ -316,10 +317,10 @@ listenxprotopr(const char *name)
                                      ASN_NULL, NULL,  0);
     if (netsnmp_query_walk( var, ss ) != SNMP_ERR_NOERROR)
         return;
-    if (var->type == ASN_NULL) /* No entries */
+    if ((var->type & 0xF0) == 0x80)	/* Exception */
         return;
 
-    printf("Listening Internet (%s) Connections\n", name);
+    printf("Listening Internet (%s) Connections\n", "tcp");
     printf("%-5.5s %-27.27s %5s\n", "Proto", "Local Address", "PID");
     for (vp = var; vp ; vp=vp->next_variable) {
 	char lname[5];
@@ -338,12 +339,12 @@ listenxprotopr(const char *name)
 	inx += vp->name[inx]+1;
         localPort = vp->name[ inx++ ];
         pid   = *vp->val.integer;
-	strcpy(lname, name);
+	strcpy(lname, "tcp");
 	if (localType == 2) lname[3] = '6';
 	else lname[3] = '4';
 	lname[4] = 0;
         printf("%-5.5s", lname);
-        inetxprint(localType, localAddr, localPort, name, 1);
+        inetxprint(localType, localAddr, localPort, "tcp", 1);
         printf(" %5d\n", pid);
     }
     snmp_free_varbind( var );
@@ -376,10 +377,10 @@ udpxprotopr(const char *name)
                                      ASN_NULL, NULL,  0);
     if (netsnmp_query_walk( var, ss ) != SNMP_ERR_NOERROR)
         return;
-    if (var->type == ASN_NULL) /* No entries */
+    if ((var->type & 0xF0) == 0x80)	/* Exception */
         return;
 
-    printf("Active Internet (%s) Connections\n", name);
+    printf("Active Internet (%s) Connections\n", "udp");
     printf("%-5.5s %-27.27s %-27.27s %5s\n", "Proto", "Local Address", "Remote Address", "PID");
     for (vp = var; vp ; vp=vp->next_variable) {
         char lname[5];
@@ -402,13 +403,13 @@ udpxprotopr(const char *name)
 	inx += vp->name[inx]+1;
         remotePort = vp->name[ inx++ ];
         pid   = *vp->val.integer;
-	strcpy(lname, name);
+	strcpy(lname, "udp");
 	if (localType == 2) lname[3] = '6';
 	else lname[3] = '4';
 	lname[4] = 0;
         printf("%-5.5s", lname);
-        inetxprint(localType, localAddr, localPort, name, 1);
-        inetxprint(remoteType, remoteAddr, remotePort, name, 1);
+        inetxprint(localType, localAddr, localPort, "udp", 1);
+        inetxprint(remoteType, remoteAddr, remotePort, "udp", 1);
         printf(" %5d\n", pid);
     }
     snmp_free_varbind( var );
@@ -432,14 +433,18 @@ statsprint(const char *name, const systemstats_t *st, int proto,
 	if (st->hcstat) {
 	    var[tbllen] = st->hcstat;
 	    snmp_varlist_add_variable( &vb, var, len, ASN_NULL, NULL,  0);
-	    if (netsnmp_query_get( vb, ss ) != SNMP_ERR_NOERROR)
-		abort();
+	    if (netsnmp_query_get( vb, ss ) != SNMP_ERR_NOERROR) {
+		snmp_free_var( vb );
+		vb = NULL;
+	    }
 	}
 	if (!vb) {
 	    var[tbllen] = st->stat;
 	    snmp_varlist_add_variable( &vb, var, len, ASN_NULL, NULL, 0);
-	    if (netsnmp_query_get( vb, ss ) != SNMP_ERR_NOERROR)
-		abort();
+	    if (netsnmp_query_get( vb, ss ) != SNMP_ERR_NOERROR) {
+		snmp_free_var( vb );
+		vb = NULL;
+	    }
 	}
 	if (vb) {
 	    if (vb->type == ASN_COUNTER) {
@@ -456,6 +461,9 @@ statsprint(const char *name, const systemstats_t *st, int proto,
 		printf("%14s %s\n", "-", st->str);
 	    snmp_free_varbind(vb);
 	}
+	else {
+	    printf("%14s %s\n", "-", st->str);
+	}
 	st++;
     }
 }
@@ -469,8 +477,10 @@ prhisto(const char *name, const oid *var, size_t len, int ver, codelist_t *cs)
     char nocode[32];
 
     snmp_varlist_add_variable( &vb, var, len, ASN_NULL, NULL,  0);
-    if (netsnmp_query_walk( vb, ss ) != SNMP_ERR_NOERROR)
-	abort();
+    if (netsnmp_query_walk( vb, ss ) != SNMP_ERR_NOERROR) {
+	snmp_free_var( vb );
+	return;
+    }
     printf("     %s histogram:\n", name);
     printf("     %10s %10s %s\n", "input", "output", "type");
     for (code = 0; code < 256; code++) {
@@ -488,9 +498,11 @@ prhisto(const char *name, const oid *var, size_t len, int ver, codelist_t *cs)
 	if (found) {
 	    cp = cs;
 	    while (cp->name && cp->code != code) cp++;
-	    if (!cp->code)
-		sprintf(nocode, "type %d", code);
-	    printf("     %10lu %10lu %s\n", inp, out, cp->name ? cp->name : nocode);
+	    if (inp || out || sflag == 1) {
+		if (!cp->code)
+		    snprintf(nocode, sizeof nocode, "type %d", code);
+		printf("     %10lu %10lu %s\n", inp, out, cp->name ? cp->name : nocode);
+	    }
 	}
     }
     snmp_free_varbind(vb);
@@ -501,8 +513,15 @@ ipx_stats(const char *name)
 {
     oid ipsysstat_oid[] = { 1, 3, 6, 1, 2, 1, 4, 31, 1, 1 };
     size_t ipsysstat_len = sizeof(ipsysstat_oid) / sizeof(ipsysstat_oid[0]);
-    statsprint("ip4", systemstats, 1, ipsysstat_oid, ipsysstat_len);
-    statsprint("ip6", systemstats, 2, ipsysstat_oid, ipsysstat_len);
+    static int first = 1;
+
+    if (!first) return;
+    first = 0;
+
+    if (!name || strcmp(name, "ip") == 0)
+	statsprint("ip", systemstats, 1, ipsysstat_oid, ipsysstat_len);
+    if (!name || strcmp(name, "ip6") == 0)
+	statsprint("ip6", systemstats, 2, ipsysstat_oid, ipsysstat_len);
 }
 
 void
@@ -512,10 +531,20 @@ icmpx_stats(const char *name)
     size_t icmpstat_len = sizeof(icmpstat_oid) / sizeof(icmpstat_oid[0]);
     oid icmpmsg_oid[] = { 1, 3, 6, 1, 2, 1, 5, 30, 1 };
     size_t icmpmsg_len = sizeof(icmpmsg_oid) / sizeof(icmpmsg_oid[0]);
-    statsprint("icmp4", icmpstats, 1, icmpstat_oid, icmpstat_len);
-    prhisto("icmp4", icmpmsg_oid, icmpmsg_len, 1, icmpcodes);
-    statsprint("icmp6", icmpstats, 2, icmpstat_oid, icmpstat_len);
-    prhisto("icmp6", icmpmsg_oid, icmpmsg_len, 2, icmp6codes);
+    static int first = 1;
+
+    if (!first)
+	return;
+    first = 0;
+
+    if (!name || strcmp(name, "icmp") == 0) {
+	statsprint("icmp", icmpstats, 1, icmpstat_oid, icmpstat_len);
+	prhisto("icmp", icmpmsg_oid, icmpmsg_len, 1, icmpcodes);
+    }
+    if (!name || strcmp(name, "icmp6") == 0) {
+	statsprint("icmp6", icmpstats, 2, icmpstat_oid, icmpstat_len);
+	prhisto("icmp6", icmpmsg_oid, icmpmsg_len, 2, icmp6codes);
+    }
 }
 
 

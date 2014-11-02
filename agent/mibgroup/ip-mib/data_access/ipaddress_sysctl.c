@@ -49,8 +49,8 @@ netsnmp_arch_ipaddress_entry_init(netsnmp_ipaddress_entry *entry)
     /*
      * init ipv4 stuff
      */
-    //if (NULL == netsnmp_ioctl_ipaddress_entry_init(entry))
-    //    return -1;
+    /* if (NULL == netsnmp_ioctl_ipaddress_entry_init(entry)) */
+    /*     return -1; */
 
     /*
      * init ipv6 stuff
@@ -69,7 +69,7 @@ netsnmp_arch_ipaddress_entry_cleanup(netsnmp_ipaddress_entry *entry)
     /*
      * cleanup ipv4 stuff
      */
-    //netsnmp_ioctl_ipaddress_entry_cleanup(entry);
+    /*netsnmp_ioctl_ipaddress_entry_cleanup(entry); */
 
     /*
      * cleanup ipv6 stuff
@@ -92,7 +92,7 @@ netsnmp_arch_ipaddress_entry_copy(netsnmp_ipaddress_entry *lhs,
     /*
      * copy ipv4 stuff
      */
-    //rc = netsnmp_ioctl_ipaddress_entry_copy(lhs, rhs);
+    /*rc = netsnmp_ioctl_ipaddress_entry_copy(lhs, rhs); */
     if (rc)
         return rc;
 
@@ -179,11 +179,12 @@ netsnmp_arch_ipaddress_container_load(netsnmp_container *container,
     if_list = (u_char*)malloc(if_list_size);
     if (if_list == NULL) {
         snmp_log(LOG_ERR, "could not allocate memory for interface info "
-                 "(%zu bytes)\n", if_list_size);
+                 "(%u bytes)\n", (unsigned) if_list_size);
         return -3;
     } else {
         DEBUGMSGTL(("access:ipaddress:container:sysctl",
-                    "allocated %zu bytes for if_list\n", if_list_size));
+                    "allocated %u bytes for if_list\n",
+                    (unsigned) if_list_size));
     }
 
     if (sysctl(sysctl_oid, sizeof(sysctl_oid)/sizeof(int), if_list,
@@ -233,7 +234,7 @@ netsnmp_arch_ipaddress_container_load(netsnmp_container *container,
                         memcpy(entry->ia_address, &a4->sin_addr.s_addr, entry->ia_address_len);
 		    }
                     else if (rtax == RTAX_NETMASK)
-                        entry->ia_prefix_len = netsnmp_ipaddress_ipv4_prefix_len(ntohl(a4->sin_addr.s_addr));
+                        entry->ia_prefix_len = netsnmp_ipaddress_ipv4_prefix_len(a4->sin_addr.s_addr);
                 }
                 else if (a->sa_family == AF_INET6) {
                     struct sockaddr_in6 *a6 = (struct sockaddr_in6 *)a;

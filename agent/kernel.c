@@ -107,16 +107,17 @@ int
 klookup(unsigned long off, void *target, size_t siz)
 {
     int             result;
+
     if (kd == NULL)
         return 0;
     result = kvm_read(kd, off, target, siz);
     if (result != siz) {
 #if HAVE_KVM_OPENFILES
-        snmp_log(LOG_ERR, "kvm_read(*, %lx, %p, %zx) = %d: %s\n", off,
-                 target, siz, result, kvm_geterr(kd));
+        snmp_log(LOG_ERR, "kvm_read(*, %lx, %p, %x) = %d: %s\n", off,
+                 target, (unsigned) siz, result, kvm_geterr(kd));
 #else
         snmp_log(LOG_ERR, "kvm_read(*, %lx, %p, %d) = %d: ", off, target,
-                 siz, result);
+                 (unsigned) siz, result);
         snmp_log_perror("klookup");
 #endif
         return 0;
@@ -150,30 +151,34 @@ int             swap = -1, mem = -1, kmem = -1;
 int
 init_kmem(const char *file)
 {
+    const int no_root_access = netsnmp_ds_get_boolean(NETSNMP_DS_APPLICATION_ID,
+                                              NETSNMP_DS_AGENT_NO_ROOT_ACCESS);
+    int res = TRUE;
+
     kmem = open(file, O_RDONLY);
-    if (kmem < 0 && !netsnmp_ds_get_boolean(NETSNMP_DS_APPLICATION_ID, 
-					    NETSNMP_DS_AGENT_NO_ROOT_ACCESS)) {
+    if (kmem < 0 && !no_root_access) {
         snmp_log_perror(file);
+        res = FALSE;
     }
     if (kmem >= 0)
         fcntl(kmem, F_SETFD, 1/*FD_CLOEXEC*/);
     mem = open("/dev/mem", O_RDONLY);
-    if (mem < 0 && !netsnmp_ds_get_boolean(NETSNMP_DS_APPLICATION_ID, 
-					   NETSNMP_DS_AGENT_NO_ROOT_ACCESS)) {
+    if (mem < 0 && !no_root_access) {
         snmp_log_perror("/dev/mem");
+        res = FALSE;
     }
     if (mem >= 0)
         fcntl(mem, F_SETFD, 1/*FD_CLOEXEC*/);
 #ifdef DMEM_LOC
     swap = open(DMEM_LOC, O_RDONLY);
-    if (swap < 0 && !netsnmp_ds_get_boolean(NETSNMP_DS_APPLICATION_ID, 
-					    NETSNMP_DS_AGENT_NO_ROOT_ACCESS)) {
+    if (swap < 0 && !no_root_access) {
         snmp_log_perror(DMEM_LOC);
+        res = FALSE;
     }
     if (swap >= 0)
         fcntl(swap, F_SETFD, 1/*FD_CLOEXEC*/);
 #endif
-    return kmem >= 0 && mem >= 0 && swap >= 0;
+    return res;
 }
 
 /** @private
@@ -215,7 +220,7 @@ klookup(unsigned long off, void *target, size_t siz)
         return 0;
 
     if ((retsiz = klseek((off_t) off)) != off) {
-        snmp_log(LOG_ERR, "klookup(%lx, %p, %d): ", off, target, siz);
+        snmp_log(LOG_ERR, "klookup(%lx, %p, %d): ", off, target, (int) siz);
         snmp_log_perror("klseek");
         return (0);
     }
@@ -225,12 +230,13 @@ klookup(unsigned long off, void *target, size_t siz)
              * these happen too often on too many architectures to print them
              * unless we're in debugging mode. People get very full log files. 
              */
-            snmp_log(LOG_ERR, "klookup(%lx, %p, %d): ", off, target, siz);
+            snmp_log(LOG_ERR, "klookup(%lx, %p, %d): ", off, target, (int) siz);
             snmp_log_perror("klread");
         }
         return (0);
     }
-    DEBUGMSGTL(("verbose:kernel:klookup", "klookup(%lx, %p, %d) succeeded", off, target, siz));
+    DEBUGMSGTL(("verbose:kernel:klookup", "klookup(%lx, %p, %d) succeeded",
+                off, target, (int) siz));
     return (1);
 }
 
