@@ -1,0 +1,337 @@
+.. comment: #! /bin/sh
+
+:Authors: Claus Klein
+:Authors: Uwe Ackermann
+:Date: 26.10.2010
+:Description: Konzept to map snmp v2c communities to different v3 contexts to prevent the v3 overhead
+
+=============================================================================
+Map snmp v2c communities to different v3 contexts
+=============================================================================
+
+.. contents::
+
+
+Motivation
+==============
+
+To demostrate the configuration options of net-snmp, we start the **snmptrapd** as a subagent.
+It regitsters its Mibs at the context named 'snmptrapd'.
+
+Normaly, you can control with context to walk over only with snmp v3 requests.
+But it is possible to map a snmp v1/v2c security group to a named context.
+
+Here we show how this is configured and how it is used while a snmp mib walk.
+
+
+Preconditions
+--------------
+
+Start from **net-snmp V5.4.3-patched** the **snmpd** and the **snmptrapd**::
+
+    apps/snmptrapd -C -c c:/usr/etc/snmp/snmptrapd.conf -x localhost -Le -f
+    agent/snmpd -Le -C -c c:/usr/etc/snmp/snmpd.conf -Le -Dauth,com2,trap,read_config,snmp_config -f
+
+Configure the snmpNotifyFilter setting with **snmpset**::
+
+  snmp_notifiyfiltertest.sh
+    SNMP-NOTIFICATION-MIB::snmpNotifyFilterProfileRowStatus.\'internal0\' = INTEGER: destroy(6)
+    SNMP-NOTIFICATION-MIB::snmpNotifyFilterProfileRowStatus.\'internal0\' = INTEGER: createAndWait(5)
+    SNMP-NOTIFICATION-MIB::snmpNotifyFilterProfileName.\'internal0\' = STRING: svfua
+    SNMP-NOTIFICATION-MIB::snmpNotifyFilterProfileRowStatus.\'internal0\' = INTEGER: active(1)
+    SNMP-NOTIFICATION-MIB::snmpNotifyFilterRowStatus.\"svfua\".1.3.6.1.4.1.59999.33.1.3.2.0.2 = INTEGER: destroy(6)
+    SNMP-NOTIFICATION-MIB::snmpNotifyFilterRowStatus.\"svfua\".1.3.6.1.4.1.59999.33.1.3.2.0.2 = INTEGER: createAndGo(4)
+    SNMP-NOTIFICATION-MIB::snmpNotifyFilterRowStatus.\"svfua\".1.3.6.1.4.1.59999.33.1.3.1.2.1.2.2 = INTEGER: destroy(6)
+    SNMP-NOTIFICATION-MIB::snmpNotifyFilterRowStatus.\"svfua\".1.3.6.1.4.1.59999.33.1.3.1.2.1.2.2 = INTEGER: createAndGo(4)
+    SNMP-NOTIFICATION-MIB::snmpNotifyFilterMask.\"svfua\".1.3.6.1.4.1.59999.33.1.3.1.2.1.2.2 = STRING: "fffb"
+    SNMP-NOTIFICATION-MIB::snmpNotifyFilterType.\"svfua\".1.3.6.1.4.1.59999.33.1.3.1.2.1.2.2 = INTEGER: excluded(2)
+
+
+The used Config files
+----------------------
+
+The file:///usr/etc/snmp/snmptrapd.conf:
+
+.. include:: c:/usr/etc/snmp/snmptrapd.conf
+             :literal: 
+
+The file:///usr/etc/snmp/snmpd.conf:
+
+.. include:: c:/usr/etc/snmp/snmpd.conf
+             :literal: 
+
+
+An snmp table walk over the list of all SNMPv3 tables context='snmptrapd':
+===========================================================================
+
+::
+
+    # snmpv2 mibs
+    MIBTABLES=" sysORTable snmpTargetParamsTable snmpTargetAddrTable
+        snmpNotifyTable snmpNotifyFilterProfileTable snmpNotifyFilterTable
+        nlmConfigLogTable nlmStatsLogTable nlmLogTable nlmLogVariableTable
+        usmUserTable vacmAccessTable vacmcontextTable vacmSecurityToGroupTable vacmViewTreeFamilyTable"
+
+    for Table in $MIBTABLES; do
+      snmptable -r 0 -C biw 100 -v 2c -c snmptrapd localhost $Table;
+    done
+
+    SNMPv2-MIB::sysORTable: No entries
+    SNMP-TARGET-MIB::snmpTargetParamsTable: No entries
+    SNMP-TARGET-MIB::snmpTargetAddrTable: No entries
+    SNMP-NOTIFICATION-MIB::snmpNotifyTable: No entries
+    SNMP-NOTIFICATION-MIB::snmpNotifyFilterProfileTable: No entries
+    SNMP-NOTIFICATION-MIB::snmpNotifyFilterTable: No entries
+    NOTIFICATION-LOG-MIB::nlmConfigLogTable: No entries
+    NOTIFICATION-LOG-MIB::nlmStatsLogTable: No entries
+
+SNMP table: NOTIFICATION-LOG-MIB::nlmLogTable::
+
+        index         Time          DateAndTime EngineID       EngineTAddress
+    \"default\".1 0:0:00:57.85 2010-10-26,15:54:7.0        ? "19 21 17 AC 08 0F "
+
+SNMP table NOTIFICATION-LOG-MIB::nlmLogTable, part 2::
+
+        index            EngineTDomain ContextEngineID ContextName        NotificationID
+    \"default\".1 SNMPv2-TM::snmpUDPDomain               ?             SNMPv2-MIB::coldStart
+
+SNMP table: NOTIFICATION-LOG-MIB::nlmLogVariableTable::
+
+          index                                       ID ValueType Counter32Val Unsigned32Val
+    \"default\".1.1 DISMAN-EXPRESSION-MIB::sysUpTimeInstance timeTicks            ?             ?
+    \"default\".1.2         SNMPv2-MIB::snmpTrapEnterprise.0  objectId            ?             ?
+
+SNMP table NOTIFICATION-LOG-MIB::nlmLogVariableTable, part 2::
+
+          index TimeTicksVal Integer32Val OctetStringVal IpAddressVal               OidVal
+    \"default\".1.1 0:0:00:01.41            ?              ?            ?                    ?
+    \"default\".1.2            ?            ?              ?            ? NET-SNMP-TC::unknown
+
+SNMP table NOTIFICATION-LOG-MIB::nlmLogVariableTable, part 3::
+
+          index Counter64Val OpaqueVal
+    \"default\".1.1            ?         ?
+    \"default\".1.2            ?         ?
+
+    SNMP-USER-BASED-SM-MIB::usmUserTable: No entries
+    SNMP-VIEW-BASED-ACM-MIB::vacmAccessTable: No entries
+    SNMP-VIEW-BASED-ACM-MIB::vacmContextTable: No entries
+    SNMP-VIEW-BASED-ACM-MIB::vacmSecurityToGroupTable: No entries
+    SNMP-VIEW-BASED-ACM-MIB::vacmViewTreeFamilyTable: No entries
+
+
+An snmp table walk over the list of all SNMPv3 tables default context='svfua':
+===============================================================================
+
+::
+
+  for Table in $MIBTABLES; do
+    snmptable -r 0 -C biw 100 -v 2c -c svfua -l noAuthNoPriv localhost $Table;
+    printf '\n----------------------------\n\n'; done 2>&1 | 
+      perl -n -e 'if (/(^SNMP table.*$)/) {print "$1::\n";} else {if (length($_) > 1) {print "\t$_";} else {print;} }'
+
+SNMP table: SNMPv2-MIB::sysORTable::
+
+         index                                              ID
+             1  SNMP-FRAMEWORK-MIB::snmpFrameworkMIBCompliance
+             2                 SNMP-MPD-MIB::snmpMPDCompliance
+             3        SNMP-USER-BASED-SM-MIB::usmMIBCompliance
+             4 SNMP-NOTIFICATION-MIB::snmpNotifyFullCompliance
+             5        NOTIFICATION-LOG-MIB::notificationLogMIB
+             6                             SNMPv2-MIB::snmpMIB
+             7         SNMP-VIEW-BASED-ACM-MIB::vacmBasicGroup
+
+SNMP table SNMPv2-MIB::sysORTable, part 2::
+
+         index                                                                                 Descr
+             1                                                 The SNMP Management Architecture MIB.
+             2                                       The MIB for Message Processing and Dispatching.
+             3        The management information definitions for the SNMP User-based Security Model.
+             4 The MIB modules for managing SNMP Notification, plus filtering and all related tables
+             5             The MIB module for logging SNMP Notifications, that is, Traps and Informs
+             6                                                    The MIB module for SNMPv2 entities
+             7                                             View-based Access Control Model for SNMP.
+
+SNMP table SNMPv2-MIB::sysORTable, part 3::
+
+         index       UpTime
+             1 0:0:00:00.26
+             2 0:0:00:00.26
+             3 0:0:00:00.26
+             4 0:0:00:00.28
+             5 0:0:00:00.29
+             6 0:0:00:00.29
+             7 0:0:00:00.31
+
+----------------------------
+
+SNMP table: SNMP-TARGET-MIB::snmpTargetParamsTable::
+
+                index MPModel SecurityModel SecurityName SecurityLevel StorageType RowStatus
+        \'internal0\'       3             3        unsec  noAuthNoPriv    readOnly    active
+
+----------------------------
+
+SNMP table: SNMP-TARGET-MIB::snmpTargetAddrTable::
+
+                index                  TDomain             TAddress Timeout RetryCount   TagList    Params
+        \'internal0\' SNMPv2-TM::snmpUDPDomain "7F 00 00 01 00 A2 "    1000          5 internal0 internal0
+
+SNMP table SNMP-TARGET-MIB::snmpTargetAddrTable, part 2::
+
+                index StorageType RowStatus
+        \'internal0\'    readOnly    active
+
+----------------------------
+
+SNMP table: SNMP-NOTIFICATION-MIB::snmpNotifyTable::
+
+                index       Tag Type StorageType RowStatus
+        \'internal0\' internal0 trap    readOnly    active
+
+----------------------------
+
+SNMP table: SNMP-NOTIFICATION-MIB::snmpNotifyFilterProfileTable::
+
+                index  Name    StorType RowStatus
+        \'internal0\' svfua nonVolatile    active
+
+----------------------------
+
+SNMP table: SNMP-NOTIFICATION-MIB::snmpNotifyFilterTable::
+
+                                               index   Mask     Type StorageType RowStatus
+        \"svfua\".1.3.6.1.4.1.59999.33.1.3.1.2.1.2.2 "fffb" excluded nonVolatile    active
+            \"svfua\".1.3.6.1.4.1.59999.33.1.3.2.0.2     "" included nonVolatile    active
+
+----------------------------
+
+        NOTIFICATION-LOG-MIB::nlmConfigLogTable: No entries
+
+----------------------------
+
+        NOTIFICATION-LOG-MIB::nlmStatsLogTable: No entries
+
+----------------------------
+
+SNMP table: NOTIFICATION-LOG-MIB::nlmLogTable::
+
+                index         Time           DateAndTime EngineID EngineTAddress EngineTDomain
+        \"default\".1 0:0:00:01.14 2010-10-26,16:20:41.0        ?              ?             ?
+
+SNMP table NOTIFICATION-LOG-MIB::nlmLogTable, part 2::
+
+                index ContextEngineID ContextName        NotificationID
+        \"default\".1               ?           ? SNMPv2-MIB::coldStart
+
+----------------------------
+
+SNMP table: NOTIFICATION-LOG-MIB::nlmLogVariableTable::
+
+                  index                                       ID ValueType Counter32Val Unsigned32Val
+        \"default\".1.1 DISMAN-EXPRESSION-MIB::sysUpTimeInstance timeTicks            ?             ?
+        \"default\".1.2         SNMPv2-MIB::snmpTrapEnterprise.0  objectId            ?             ?
+
+SNMP table NOTIFICATION-LOG-MIB::nlmLogVariableTable, part 2::
+
+                  index TimeTicksVal Integer32Val OctetStringVal IpAddressVal               OidVal
+        \"default\".1.1 0:0:00:00.99            ?              ?            ?                    ?
+        \"default\".1.2            ?            ?              ?            ? NET-SNMP-TC::unknown
+
+SNMP table NOTIFICATION-LOG-MIB::nlmLogVariableTable, part 3::
+
+                  index Counter64Val OpaqueVal
+        \"default\".1.1            ?         ?
+        \"default\".1.2            ?         ?
+
+----------------------------
+
+SNMP table: SNMP-USER-BASED-SM-MIB::usmUserTable::
+
+                              index SecurityName               CloneFrom
+        \".....z..O...L\".\"unsec\"        unsec SNMPv2-SMI::zeroDotZero
+
+SNMP table SNMP-USER-BASED-SM-MIB::usmUserTable, part 2::
+
+                              index                                   AuthProtocol AuthKeyChange
+        \".....z..O...L\".\"unsec\" SNMP-USER-BASED-SM-MIB::usmHMACMD5AuthProtocol            ""
+
+SNMP table SNMP-USER-BASED-SM-MIB::usmUserTable, part 3::
+
+                              index OwnAuthKeyChange                               PrivProtocol
+        \".....z..O...L\".\"unsec\"               "" SNMP-USER-BASED-SM-MIB::usmDESPrivProtocol
+
+SNMP table SNMP-USER-BASED-SM-MIB::usmUserTable, part 4::
+
+                              index PrivKeyChange OwnPrivKeyChange Public StorageType Status
+        \".....z..O...L\".\"unsec\"            ""               ""     "" nonVolatile active
+
+----------------------------
+
+SNMP table: SNMP-VIEW-BASED-ACM-MIB::vacmAccessTable::
+
+                                            index ContextMatch ReadViewName WriteViewName NotifyViewName
+                 \"grpcomm2\".\"\".0.noAuthNoPriv       prefix       system          none           none
+                 \"grpcomm3\".\"\".0.noAuthNoPriv       prefix          iso           iso            iso
+             \"grpcomm4\".\"wfa1\".0.noAuthNoPriv        exact          iso           iso            iso
+             \"grpcomm5\".\"wfa2\".0.noAuthNoPriv        exact          iso           iso            iso
+             \"grpcomm6\".\"wfa3\".0.noAuthNoPriv        exact          iso           iso            iso
+        \"grpcomm7\".\"snmptrapd\".0.noAuthNoPriv        exact          iso           iso            iso
+                 \"grpunsec\".\"\".3.noAuthNoPriv       prefix          iso           iso            iso
+
+SNMP table SNMP-VIEW-BASED-ACM-MIB::vacmAccessTable, part 2::
+
+                                            index StorageType Status
+                 \"grpcomm2\".\"\".0.noAuthNoPriv   permanent active
+                 \"grpcomm3\".\"\".0.noAuthNoPriv   permanent active
+             \"grpcomm4\".\"wfa1\".0.noAuthNoPriv   permanent active
+             \"grpcomm5\".\"wfa2\".0.noAuthNoPriv   permanent active
+             \"grpcomm6\".\"wfa3\".0.noAuthNoPriv   permanent active
+        \"grpcomm7\".\"snmptrapd\".0.noAuthNoPriv   permanent active
+                 \"grpunsec\".\"\".3.noAuthNoPriv   permanent active
+
+----------------------------
+
+SNMP table: SNMP-VIEW-BASED-ACM-MIB::vacmContextTable::
+
+                index vacmContextName
+                 \"\"
+        \"snmptrapd\"       snmptrapd
+
+----------------------------
+
+SNMP table: SNMP-VIEW-BASED-ACM-MIB::vacmSecurityToGroupTable::
+
+              index GroupName SecurityToGroupStorageType SecurityToGroupStatus
+        1.\"comm2\"  grpcomm2                  permanent                active
+        1.\"comm3\"  grpcomm3                  permanent                active
+        1.\"comm4\"  grpcomm4                  permanent                active
+        1.\"comm5\"  grpcomm5                  permanent                active
+        1.\"comm6\"  grpcomm6                  permanent                active
+        1.\"comm7\"  grpcomm7                  permanent                active
+        2.\"comm2\"  grpcomm2                  permanent                active
+        2.\"comm3\"  grpcomm3                  permanent                active
+        2.\"comm4\"  grpcomm4                  permanent                active
+        2.\"comm5\"  grpcomm5                  permanent                active
+        2.\"comm6\"  grpcomm6                  permanent                active
+        2.\"comm7\"  grpcomm7                  permanent                active
+        3.\"unsec\"  grpunsec                  permanent                active
+
+----------------------------
+
+SNMP table: SNMP-VIEW-BASED-ACM-MIB::vacmViewTreeFamilyTable::
+
+                             index Mask     Type StorageType Status
+                       \"iso\".1.1   "" included   permanent active
+                     \"_all_\".1.0   "" included   permanent active
+                     \"_all_\".1.1   "" included   permanent active
+                     \"_all_\".1.2   "" included   permanent active
+                    \"_none_\".1.0   "" excluded   permanent active
+                    \"_none_\".1.1   "" excluded   permanent active
+                    \"_none_\".1.2   "" excluded   permanent active
+        \"system\".7.1.3.6.1.2.1.1   "" included   permanent active
+
+----------------------------
+
+/cygdrive/c/downloads/net-snmp-5.4.3-patched
+
